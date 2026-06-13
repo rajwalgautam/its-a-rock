@@ -115,7 +115,7 @@ jobs:
       - name: Bump app.json version and create PR
         if: steps.resolve.outputs.is_rerelease == 'false'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
           VERSION="${{ steps.resolve.outputs.version }}"
           BARE="${VERSION#v}"
@@ -150,7 +150,7 @@ jobs:
       - name: Wait for PR checks and auto-merge
         if: steps.resolve.outputs.is_rerelease == 'false'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
           VERSION="${{ steps.resolve.outputs.version }}"
           BARE="${VERSION#v}"
@@ -182,7 +182,7 @@ jobs:
       - name: Create and push tag
         if: steps.resolve.outputs.is_rerelease == 'false'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
           VERSION="${{ steps.resolve.outputs.version }}"
 
