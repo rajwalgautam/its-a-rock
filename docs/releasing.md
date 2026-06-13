@@ -27,14 +27,37 @@ local device deploy used for testing.
 
 The release build is signed with a keystore that **must not** be committed
 (`.gitignore` already excludes `*.jks` / `*.keystore` / credentials). Generate a
-**new** keystore for It's A Rock (do not reuse water-tracker's):
+**new** keystore for It's A Rock (do not reuse water-tracker's).
 
-```sh
-keytool -genkeypair -v \
-  -keystore its-a-rock-release.jks \
-  -alias its-a-rock \
-  -keyalg RSA -keysize 2048 -validity 10000
-```
+`keytool` ships with a JDK. macOS has a stub `/usr/bin/java` that only prompts
+you to install Java, so `keytool` fails with *"Unable to locate a Java
+Runtime"* until a real JDK is present. Use whichever you have:
+
+- **Android Studio's bundled JDK** (no install — easiest if you already build
+  Android locally):
+
+  ```sh
+  "/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/keytool" \
+    -genkeypair -v \
+    -keystore its-a-rock-release.jks \
+    -alias its-a-rock \
+    -keyalg RSA -keysize 2048 -validity 10000
+  ```
+
+- **A standalone JDK 17** (also required for local Gradle release builds, so
+  recommended if you'll run `scripts/deploy-pixel.sh --release`):
+
+  ```sh
+  brew install --cask temurin@17
+  # new shell, or: export JAVA_HOME="$(/usr/libexec/java_home -v 17)"
+  keytool -genkeypair -v \
+    -keystore its-a-rock-release.jks \
+    -alias its-a-rock \
+    -keyalg RSA -keysize 2048 -validity 10000
+  ```
+
+`keytool` will prompt for a keystore password and the key's distinguished-name
+fields; remember the password and alias — you need them for the secrets below.
 
 Then add these four repository secrets
 (**Settings → Secrets and variables → Actions**):
