@@ -126,6 +126,10 @@ jobs:
           fi
 
           BUMP_BRANCH="release/${VERSION}-app-bump"
+
+          # Clean up any existing bump branch from previous failed runs
+          git push origin --delete "${BUMP_BRANCH}" 2>/dev/null || true
+
           git checkout -b "${BUMP_BRANCH}"
 
           node -e "
