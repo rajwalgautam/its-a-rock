@@ -1,0 +1,260 @@
+# CI: run tests + typecheck on every push to main and on pull requests.
+#
+# Release (workflow_dispatch):
+#   "v0.1.9"               →  bumps app.json, creates the tag, builds and publishes the APK.
+#   "v0.1.5-rerelease"     →  rebuilds the APK from the v0.1.5 tag and publishes it as
+#                              a separate "v0.1.5-rerelease" release; no tag or branch changes.
+#
+# Unlike water-tracker (which publishes to a separate release repo via a PAT),
+# It's A Rock publishes the APK as a Release in THIS repo using the built-in
+# GITHUB_TOKEN. No RELEASE_REPO_TOKEN is needed.
+name: CI / Release
+
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch'
+    && format('Release {0} — @{1}', github.event.inputs.version, github.actor)
+    || format('CI — {0}', github.ref_name) }}
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.github/ISSUE_TEMPLATE/**'
+      - 'changelogs/**'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.github/ISSUE_TEMPLATE/**'
+      - 'changelogs/**'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. v0.1.9. For a re-release enter e.g. v0.1.5-rerelease'
+        required: true
+
+# ─── Jobs ─────────────────────────────────────────────────────────────────────
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Always runs: typecheck + unit tests
+  # ---------------------------------------------------------------------------
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run unit tests
+        run: npm test
+
+  # ---------------------------------------------------------------------------
+  # Manual dispatch only: resolve version from input, bump app.json, create tag
+  # ---------------------------------------------------------------------------
+  create-tag:
+    name: Validate & create release tag
+    if: github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version:      ${{ steps.resolve.outputs.version }}
+      release_tag:  ${{ steps.resolve.outputs.release_tag }}
+      checkout_ref: ${{ steps.resolve.outputs.checkout_ref }}
+      is_rerelease: ${{ steps.resolve.outputs.is_rerelease }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Resolve version and mode
+        id: resolve
+        run: |
+          INPUT="${{ github.event.inputs.version }}"
+
+          if [[ "$INPUT" == *"-rerelease" ]]; then
+            # ── Re-release mode ──────────────────────────────────────────────
+            BASE="${INPUT%-rerelease}"   # e.g. v0.1.5
+            if ! git ls-remote --tags origin "refs/tags/${BASE}" | grep -q "refs/tags/${BASE}"; then
+              echo "Tag ${BASE} does not exist — cannot re-release a version that was never released."
+              exit 1
+            fi
+            echo "version=${BASE}"       >> "$GITHUB_OUTPUT"
+            echo "release_tag=${INPUT}"  >> "$GITHUB_OUTPUT"
+            echo "checkout_ref=${BASE}"  >> "$GITHUB_OUTPUT"
+            echo "is_rerelease=true"     >> "$GITHUB_OUTPUT"
+            echo "Re-release mode: building from ${BASE}, publishing as ${INPUT}"
+          else
+            # ── Normal release mode ──────────────────────────────────────────
+            VERSION="$INPUT"
+            echo "version=${VERSION}"      >> "$GITHUB_OUTPUT"
+            echo "release_tag=${VERSION}"  >> "$GITHUB_OUTPUT"
+            echo "checkout_ref=${VERSION}" >> "$GITHUB_OUTPUT"
+            echo "is_rerelease=false"      >> "$GITHUB_OUTPUT"
+            echo "Release version: ${VERSION}"
+          fi
+
+      - name: Bump app.json version and commit
+        if: steps.resolve.outputs.is_rerelease == 'false'
+        run: |
+          VERSION="${{ steps.resolve.outputs.version }}"
+          BARE="${VERSION#v}"
+          CURRENT=$(node -e "const a=require('./app.json');console.log(a.expo.version)")
+          if [ "$CURRENT" = "$BARE" ]; then
+            echo "app.json already at ${BARE} — nothing to commit"
+          else
+            node -e "
+              const fs = require('fs');
+              const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+              app.expo.version = '${BARE}';
+              fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
+            "
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add app.json
+            git commit -m "chore: bump app.json to ${BARE}"
+            git push origin HEAD:main
+            echo "Committed app.json bump to ${BARE}"
+          fi
+
+      - name: Create and push tag
+        if: steps.resolve.outputs.is_rerelease == 'false'
+        run: |
+          VERSION="${{ steps.resolve.outputs.version }}"
+          if git ls-remote --tags origin "refs/tags/${VERSION}" | grep -q "refs/tags/${VERSION}"; then
+            git push origin ":refs/tags/${VERSION}"
+            echo "Deleted existing remote tag ${VERSION}"
+          fi
+          git tag -f "${VERSION}"
+          git push origin "${VERSION}"
+          echo "Created and pushed tag ${VERSION}"
+
+  # ---------------------------------------------------------------------------
+  # Manual dispatch only: build APK and publish release (runs after create-tag)
+  # ---------------------------------------------------------------------------
+  build-release:
+    name: Build & publish release APK
+    if: github.event_name == 'workflow_dispatch'
+    needs: create-tag
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.create-tag.outputs.checkout_ref }}
+
+      - name: Check release doesn't already exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_TAG="${{ needs.create-tag.outputs.release_tag }}"
+          if gh release view "${RELEASE_TAG}" &>/dev/null; then
+            echo "Release ${RELEASE_TAG} already exists — nothing to do"
+            exit 1
+          fi
+          echo "No existing release for ${RELEASE_TAG} — proceeding with build"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Expo prebuild
+        uses: actions/cache@v4
+        id: prebuild-cache
+        with:
+          path: android
+          key: expo-prebuild-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.json', 'app.config.*', 'plugins/**') }}
+
+      - name: Generate Android project
+        if: steps.prebuild-cache.outputs.cache-hit != 'true'
+        run: npx expo prebuild --platform android --non-interactive
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          build-root-directory: android
+          cache-read-only: false
+
+      - name: Write release keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+
+      - name: Build release APK
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew assembleRelease
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk-${{ needs.create-tag.outputs.release_tag }}
+          path: android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Compose release notes
+        run: |
+          VERSION="${{ needs.create-tag.outputs.version }}"
+          BARE="${VERSION#v}"
+          REPO="${{ github.repository }}"
+          CHANGELOG=""
+          for f in "changelogs/${VERSION}.md" "changelogs/${BARE}.md"; do
+            [ -f "$f" ] && CHANGELOG="$f" && break
+          done
+          if [ -z "$CHANGELOG" ]; then
+            echo "No changelog found for ${VERSION}; publishing with a minimal note."
+            printf 'Release %s\n' "${VERSION}" > /tmp/release-notes.md
+          else
+            LINK="**Changelog:** [${CHANGELOG}](https://github.com/${REPO}/blob/${VERSION}/${CHANGELOG})"
+            printf '%s\n\n---\n\n' "$LINK" > /tmp/release-notes.md
+            sed '/^## Under the hood/,$d' "$CHANGELOG" | sed 's/[[:space:]]*$//' >> /tmp/release-notes.md
+          fi
+
+      - name: Publish release to its-a-rock
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.create-tag.outputs.release_tag }}
+          name: ${{ needs.create-tag.outputs.release_tag }}
+          body_path: /tmp/release-notes.md
+          files: android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Trim build outputs from prebuild cache
+        if: always()
+        run: rm -rf android/app/build
