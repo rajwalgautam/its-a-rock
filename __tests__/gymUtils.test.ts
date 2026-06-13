@@ -1,16 +1,23 @@
-import { formatGymName, isValidGymName, normalizeGymName } from '@/utils/gymUtils';
+import { formatGymName, normalizeGymName } from '@/utils/gymUtils';
 
-describe('gymUtils', () => {
-  it('normalizes gym names case-insensitively', () => {
-    expect(normalizeGymName('  The   Cliffs  ')).toBe('the cliffs');
+describe('normalizeGymName', () => {
+  it('lowercases, trims, and collapses internal whitespace', () => {
+    expect(normalizeGymName('  Movement   Englewood ')).toBe('movement englewood');
   });
 
-  it('formats gym display names without extra spaces', () => {
-    expect(formatGymName('  Movement   LIC ')).toBe('Movement LIC');
+  it('treats differently-cased/spaced names as the same key (dedupe)', () => {
+    expect(normalizeGymName('Movement Englewood')).toBe(
+      normalizeGymName('movement   englewood'),
+    );
   });
 
-  it('rejects empty gym names', () => {
-    expect(isValidGymName('   ')).toBe(false);
-    expect(isValidGymName('Local Gym')).toBe(true);
+  it('handles location-style names', () => {
+    expect(normalizeGymName('Denver, CO')).toBe('denver, co');
+  });
+});
+
+describe('formatGymName', () => {
+  it('trims and collapses whitespace but preserves casing', () => {
+    expect(formatGymName('  Movement   Englewood ')).toBe('Movement Englewood');
   });
 });

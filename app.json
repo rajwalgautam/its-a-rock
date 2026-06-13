@@ -2,28 +2,29 @@
   "expo": {
     "name": "It's A Rock",
     "slug": "its-a-rock",
+    "version": "0.0.0",
     "scheme": "itsarock",
-    "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.itsarock.app"
     },
     "android": {
-      "package": "com.rajwalgautam.itsarock"
+      "package": "com.itsarock.app",
+      "permissions": [
+        "android.permission.REQUEST_INSTALL_PACKAGES",
+        "android.permission.VIBRATE"
+      ]
     },
     "plugins": [
       "expo-router",
       "expo-sqlite",
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "It's A Rock uses your photo library so you can attach route photos to local bouldering entries."
-        }
-      ]
-    ]
+      "expo-image-picker"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }
