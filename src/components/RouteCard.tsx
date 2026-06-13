@@ -1,0 +1,172 @@
+import { useState } from 'react';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
+import { useTheme } from '@/theme/ThemeProvider';
+import { RouteForm } from '@/components/RouteForm';
+import { useRouteStore } from '@/store/useRouteStore';
+import { formatDate, formatGradeLabel, statusLabel } from '@/utils/formatters';
+import type { RouteInput, RouteWithGym } from '@/types';
+
+interface RouteCardProps {
+  route: RouteWithGym;
+  /** Called with the updated route after a successful save. */
+  onSaved?: (route: RouteWithGym) => void;
+}
+
+/** Reusable detail card that flips between view and edit; edits persist to SQLite. */
+export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element {
+  const { colors } = useTheme();
+  const editRoute = useRouteStore((s) => s.editRoute);
+  const [editing, setEditing] = useState(false);
+  const [current, setCurrent] = useState(route);
+
+  async function handleSave(input: RouteInput): Promise<void> {
+    const updated = await editRoute(current.id, input);
+    setCurrent(updated);
+    setEditing(false);
+    onSaved?.(updated);
+  }
+
+  if (editing) {
+    return (
+      <View style={styles.container}>
+        <RouteForm
+          initial={current}
+          submitLabel="Save"
+          onSubmit={handleSave}
+          onCancel={() => setEditing(false)}
+        />
+      </View>
+    );
+  }
+
+  const hasPhoto = current.photoUri !== null && current.photoUri.length > 0;
+
+  return (
+    <View style={styles.container}>
+      {hasPhoto && (
+        <Image source={{ uri: current.photoUri! }} style={styles.photo} resizeMode="cover" />
+      )}
+
+      <View style={styles.headerRow}>
+        <Text style={[styles.grade, { color: colors.textPrimary }]}>
+          {formatGradeLabel(current.grade)}
+        </Text>
+        <View
+          style={[
+            styles.statusPill,
+            { backgroundColor: current.completed ? colors.success : colors.warning },
+          ]}
+        >
+          <Text style={styles.statusText}>{statusLabel(current.completed)}</Text>
+        </View>
+      </View>
+
+      {current.name !== null && current.name.length > 0 && (
+        <Text style={[styles.name, { color: colors.textSecondary }]}>{current.name}</Text>
+      )}
+
+      <DetailRow icon="location-outline" value={current.gym.name} />
+      {current.startedAt !== null && (
+        <DetailRow icon="play-outline" label="Started" value={formatDate(current.startedAt)} />
+      )}
+      {current.completedAt !== null && (
+        <DetailRow icon="flag-outline" label="Sent" value={formatDate(current.completedAt)} />
+      )}
+      {current.notes !== null && current.notes.length > 0 && (
+        <DetailRow icon="document-text-outline" value={current.notes} />
+      )}
+
+      <Pressable
+        onPress={() => setEditing(true)}
+        style={[styles.editBtn, { borderColor: colors.border }]}
+      >
+        <Ionicons name="create-outline" size={18} color={colors.primary} />
+        <Text style={[styles.editText, { color: colors.primary }]}>Edit</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function DetailRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label?: string;
+  value: string;
+}): React.JSX.Element {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.detailRow}>
+      <Ionicons name={icon} size={18} color={colors.textMuted} />
+      {label !== undefined && (
+        <Text style={[styles.detailLabel, { color: colors.textMuted }]}>{label}</Text>
+      )}
+      <Text style={[styles.detailValue, { color: colors.textPrimary }]}>{value}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    gap: SPACING.md,
+  },
+  photo: {
+    width: '100%',
+    height: 280,
+    borderRadius: RADIUS.lg,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  grade: {
+    fontSize: FONT_SIZE.xxxl,
+    fontWeight: '800',
+  },
+  statusPill: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.full,
+  },
+  statusText: {
+    color: '#FFFFFF',
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+  },
+  name: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '600',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  detailLabel: {
+    fontSize: FONT_SIZE.sm,
+    width: 52,
+  },
+  detailValue: {
+    flex: 1,
+    fontSize: FONT_SIZE.md,
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    marginTop: SPACING.sm,
+  },
+  editText: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+  },
+});

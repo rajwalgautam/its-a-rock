@@ -21,7 +21,11 @@
     "plugins": [
       "expo-router",
       "expo-sqlite",
-      "expo-image-picker"
+      "expo-image-picker",
+      "./plugins/withAndroidCompileSdk",
+      "./plugins/withAndroidMaterialPin",
+      "./plugins/withAndroidSigning",
+      "./plugins/withGradleProperties"
     ],
     "experiments": {
       "typedRoutes": true

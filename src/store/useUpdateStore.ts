@@ -17,7 +17,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
   runStartupCheck: async () => {
     try {
       const result = await performUpdateCheck();
-      if (!result.isNewer || result.remoteVersion === null) return;
+      if (!result.isNewer) return;
       const lastNotified = await getLastNotifiedVersion();
       if (lastNotified === result.remoteVersion) return;
       set({ availableVersion: result.remoteVersion });

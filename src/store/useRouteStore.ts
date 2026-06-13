@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Gym, RouteInput, RouteWithGym } from '@/types';
+import type { Gym, RouteInput, RouteWithGym, WeeklyStats } from '@/types';
 import {
   createRoute,
   deleteRoute,
@@ -10,19 +10,19 @@ import {
   resetAllData,
   updateRoute,
 } from '@/db/queries';
-
-// Weekly stats live on this store too (see docs/BLUEPRINT.md §7) but the
-// computation (routeStats) is added with the My Climbing work — issue #29.
+import { computeWeeklyStats } from '@/utils/routeStats';
 
 interface RouteState {
   routes: RouteWithGym[];
   projects: RouteWithGym[];
   gyms: Gym[];
+  weeklyStats: WeeklyStats | null;
   isLoading: boolean;
   error: string | null;
   loadRoutes: () => Promise<void>;
   loadProjects: () => Promise<void>;
   loadGyms: () => Promise<void>;
+  loadWeeklyStats: () => Promise<void>;
   getRoute: (id: number) => Promise<RouteWithGym | null>;
   addRoute: (input: RouteInput) => Promise<RouteWithGym>;
   editRoute: (id: number, input: RouteInput) => Promise<RouteWithGym>;
@@ -34,6 +34,7 @@ export const useRouteStore = create<RouteState>((set, get) => ({
   routes: [],
   projects: [],
   gyms: [],
+  weeklyStats: null,
   isLoading: false,
   error: null,
 
@@ -67,6 +68,16 @@ export const useRouteStore = create<RouteState>((set, get) => ({
     }
   },
 
+  loadWeeklyStats: async () => {
+    set({ error: null });
+    try {
+      const all = await getRoutes();
+      set({ weeklyStats: computeWeeklyStats(all) });
+    } catch (e) {
+      set({ error: errMessage(e) });
+    }
+  },
+
   getRoute: async (id) => {
     return getRouteById(id);
   },
@@ -90,13 +101,18 @@ export const useRouteStore = create<RouteState>((set, get) => ({
 
   clearAll: async () => {
     await resetAllData();
-    set({ routes: [], projects: [], gyms: [] });
+    set({ routes: [], projects: [], gyms: [], weeklyStats: computeWeeklyStats([]) });
   },
 }));
 
 /** Re-read the lists that a mutation can affect. */
 async function refresh(get: () => RouteState): Promise<void> {
-  await Promise.all([get().loadRoutes(), get().loadProjects(), get().loadGyms()]);
+  await Promise.all([
+    get().loadRoutes(),
+    get().loadProjects(),
+    get().loadGyms(),
+    get().loadWeeklyStats(),
+  ]);
 }
 
 function errMessage(e: unknown): string {
