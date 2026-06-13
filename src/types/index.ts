@@ -1,33 +1,22 @@
-export type RouteTagId =
-  | 'slopey'
-  | 'crimpy'
-  | 'pinchy'
-  | 'juggy'
-  | 'pocket'
-  | 'technical'
-  | 'powerful'
-  | 'balance'
-  | 'dynamic'
-  | 'static'
-  | 'compression'
-  | 'overhang'
-  | 'slab'
-  | 'vertical'
-  | 'long_route'
-  | 'short_route'
-  | 'reachy'
-  | 'coordination'
-  | 'footwork'
-  | 'project';
+// Domain types for It's A Rock. See docs/BLUEPRINT.md §4.2.
 
-export type RouteGrade = 'VB' | 'V0' | 'V1' | 'V2' | 'V3' | 'V4' | 'V5' | 'V6' | 'V7' | 'V8' | 'V9';
+export type GradeBase =
+  | 'VB'
+  | 'V0'
+  | 'V1'
+  | 'V2'
+  | 'V3'
+  | 'V4'
+  | 'V5'
+  | 'V6'
+  | 'V7'
+  | 'V8'
+  | 'V9'
+  | 'V10'
+  | 'V11'
+  | 'V12';
 
-export interface RouteTag {
-  id: RouteTagId;
-  label: string;
-  category: 'hold' | 'style' | 'movement' | 'angle' | 'endurance' | 'position' | 'technique' | 'status';
-  color: string;
-}
+export type GradeModifier = '' | '+' | '-';
 
 export interface Gym {
   readonly id: number;
@@ -37,73 +26,64 @@ export interface Gym {
   updatedAt: number;
 }
 
-export interface PhotoRef {
-  assetId?: string | null;
-  uri?: string | null;
-  width?: number | null;
-  height?: number | null;
-}
-
 export interface BoulderRoute {
   readonly id: number;
-  name: string;
+  name: string | null;
   gymId: number;
-  photoAssetId?: string | null;
-  photoUri?: string | null;
-  photoWidth?: number | null;
-  photoHeight?: number | null;
-  grade: RouteGrade;
-  attempts: number;
+  photoUri: string | null;
+  photoWidth: number | null;
+  photoHeight: number | null;
+  /** Serialized base+modifier, e.g. "V4+". */
+  grade: string | null;
   completed: boolean;
-  notes?: string | null;
-  climbedAt: number;
+  notes: string | null;
+  startedAt: number | null;
+  completedAt: number | null;
   createdAt: number;
   updatedAt: number;
 }
 
-export interface RouteWithRelations extends BoulderRoute {
+export interface RouteWithGym extends BoulderRoute {
   gym: Gym;
-  tags: RouteTagId[];
 }
 
 export interface RouteInput {
-  name: string;
+  name?: string | null;
+  /** Resolved/created into a gym row by normalized name. */
   gymName: string;
-  photo?: PhotoRef | null;
-  grade: RouteGrade;
-  attempts: number;
+  photoUri?: string | null;
+  photoWidth?: number | null;
+  photoHeight?: number | null;
+  grade?: string | null;
   completed: boolean;
   notes?: string | null;
-  tagIds: RouteTagId[];
-  climbedAt: number;
+  startedAt?: number | null;
+  completedAt?: number | null;
 }
-
-export interface DailyRouteStats {
-  date: string;
-  totalRoutes: number;
-  completedRoutes: number;
-  totalAttempts: number;
-  gymIds: number[];
-  tagCounts: Partial<Record<RouteTagId, number>>;
-}
-
-export interface SummaryStats {
-  totalRoutes: number;
-  completedRoutes: number;
-  completionRate: number;
-  totalAttempts: number;
-  avgAttemptsPerCompleted: number;
-  daysClimbed: number;
-  activeGyms: number;
-  mostClimbedGymName: string | null;
-  mostCommonTags: Array<{ tagId: RouteTagId; count: number }>;
-}
-
-export type CompletedFilter = 'all' | 'completed' | 'not_completed';
 
 export interface RouteFilters {
-  searchQuery?: string;
-  gymId?: number | null;
-  completedFilter?: CompletedFilter;
-  tagIds?: RouteTagId[];
+  /** Filter by completion status; omit for all routes. */
+  completed?: boolean;
+  /** Restrict to a single gym. */
+  gymId?: number;
 }
+
+export interface WeeklyStats {
+  /** Local midnight of the week's Monday. */
+  weekStart: number;
+  /** Distinct days with >=1 route logged this week. */
+  visits: number;
+  /** Routes sent this week. */
+  completedThisWeek: number;
+  /** Routes created this week. */
+  addedThisWeek: number;
+  /** Current count of completed = false. */
+  activeProjects: number;
+}
+
+// ---- Settings / theme ----
+
+export type ThemeMode = 'light' | 'dark' | 'system';
+
+/** Tiles per row in the route grid. */
+export type ColumnDensity = 2 | 3 | 4;

@@ -1,74 +1,48 @@
 {
   "name": "its-a-rock",
-  "version": "1.0.0",
-  "description": "Bouldering app",
+  "version": "0.0.0",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
+    "typecheck": "tsc --noEmit",
     "test": "jest --watchAll=false",
-    "test:watch": "jest --watchAll",
-    "typecheck": "tsc --noEmit"
+    "test:watch": "jest --watchAll"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/rajwalgautam/its-a-rock.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/rajwalgautam/its-a-rock/issues"
-  },
-  "homepage": "https://github.com/rajwalgautam/its-a-rock#readme",
   "dependencies": {
-    "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "expo": "^55.0.19",
-    "expo-constants": "~55.0.15",
-    "expo-haptics": "~55.0.14",
-    "expo-image-picker": "~55.0.19",
-    "expo-linking": "~55.0.14",
-    "expo-router": "^55.0.13",
-    "expo-sqlite": "~55.0.15",
-    "expo-status-bar": "~55.0.5",
+    "expo": "~55.0.23",
+    "expo-constants": "~55.0.16",
+    "expo-haptics": "^55.0.14",
+    "expo-image-picker": "~55.0.14",
+    "expo-linking": "~55.0.15",
+    "expo-router": "~55.0.14",
+    "expo-sqlite": "^55.0.15",
+    "expo-status-bar": "~55.0.6",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-native": "0.83.6",
     "react-native-gesture-handler": "~2.30.0",
-    "react-native-safe-area-context": "~5.6.2",
+    "react-native-reanimated": "4.2.1",
+    "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.23.0",
+    "react-native-worklets": "0.7.4",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
-    "@types/jest": "29.5.14",
-    "@types/react": "^19.2.14",
-    "babel-preset-expo": "^55.0.19",
+    "@testing-library/react-native": "^14.0.0",
+    "@types/jest": "^29.5.14",
+    "@types/react": "~19.2.10",
+    "babel-plugin-module-resolver": "^5.0.3",
+    "babel-preset-expo": "^55.0.18",
     "jest": "~29.7.0",
+    "jest-expo": "~55.0.17",
     "ts-jest": "^29.4.9",
     "typescript": "~5.9.2"
   },
-  "jest": {
-    "preset": "ts-jest",
-    "testEnvironment": "node",
-    "transform": {
-      "^.+\\.tsx?$": [
-        "ts-jest",
-        {
-          "tsconfig": {
-            "jsx": "react",
-            "strict": true
-          }
-        }
-      ]
-    },
-    "moduleNameMapper": {
-      "^@/(.*)$": "<rootDir>/src/$1"
-    },
-    "testMatch": [
-      "**/__tests__/**/*.test.ts"
-    ]
-  }
+  "overrides": {
+    "react": "19.2.0"
+  },
+  "private": true
 }

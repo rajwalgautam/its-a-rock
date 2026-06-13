@@ -1,9 +1,6 @@
-import { type SQLiteBindValue } from 'expo-sqlite';
 import { getDatabase } from './database';
-import { Gym, RouteFilters, RouteGrade, RouteInput, RouteTagId, RouteWithRelations } from '@/types';
-import { getMonthRange } from '@/utils/dateUtils';
 import { formatGymName, normalizeGymName } from '@/utils/gymUtils';
-import { validateRouteInput } from '@/utils/validators';
+import type { Gym, RouteFilters, RouteInput, RouteWithGym } from '@/types';
 
 interface GymRow {
   id: number;
@@ -15,25 +12,36 @@ interface GymRow {
 
 interface RouteJoinRow {
   id: number;
-  name: string;
+  name: string | null;
   gym_id: number;
-  photo_asset_id: string | null;
   photo_uri: string | null;
   photo_width: number | null;
   photo_height: number | null;
-  grade: string;
-  attempts: number;
+  grade: string | null;
   completed: number;
   notes: string | null;
-  climbed_at: number;
+  started_at: number | null;
+  completed_at: number | null;
   created_at: number;
   updated_at: number;
   gym_name: string;
   gym_normalized_name: string;
   gym_created_at: number;
   gym_updated_at: number;
-  tag_id: string | null;
 }
+
+const ROUTE_SELECT = `
+  SELECT
+    r.id, r.name, r.gym_id, r.photo_uri, r.photo_width, r.photo_height,
+    r.grade, r.completed, r.notes, r.started_at, r.completed_at,
+    r.created_at, r.updated_at,
+    g.name            AS gym_name,
+    g.normalized_name AS gym_normalized_name,
+    g.created_at      AS gym_created_at,
+    g.updated_at      AS gym_updated_at
+  FROM routes r
+  JOIN gyms g ON g.id = r.gym_id
+`;
 
 function mapGym(row: GymRow): Gym {
   return {
@@ -45,264 +53,175 @@ function mapGym(row: GymRow): Gym {
   };
 }
 
-function mapRoutes(rows: RouteJoinRow[]): RouteWithRelations[] {
-  const byId = new Map<number, RouteWithRelations>();
-
-  for (const row of rows) {
-    const existing = byId.get(row.id);
-    if (existing) {
-      if (row.tag_id !== null && !existing.tags.includes(row.tag_id as RouteTagId)) {
-        existing.tags.push(row.tag_id as RouteTagId);
-      }
-      continue;
-    }
-
-    byId.set(row.id, {
-      id: row.id,
-      name: row.name,
-      gymId: row.gym_id,
-      photoAssetId: row.photo_asset_id,
-      photoUri: row.photo_uri,
-      photoWidth: row.photo_width,
-      photoHeight: row.photo_height,
-      grade: row.grade as RouteGrade,
-      attempts: row.attempts,
-      completed: row.completed === 1,
-      notes: row.notes,
-      climbedAt: row.climbed_at,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      gym: {
-        id: row.gym_id,
-        name: row.gym_name,
-        normalizedName: row.gym_normalized_name,
-        createdAt: row.gym_created_at,
-        updatedAt: row.gym_updated_at,
-      },
-      tags: row.tag_id === null ? [] : [row.tag_id as RouteTagId],
-    });
-  }
-
-  return Array.from(byId.values());
-}
-
-async function getRouteRows(where = '', params: SQLiteBindValue[] = []): Promise<RouteWithRelations[]> {
-  const database = getDatabase();
-  const rows = await database.getAllAsync<RouteJoinRow>(
-    `
-      SELECT
-        r.id,
-        r.name,
-        r.gym_id,
-        r.photo_asset_id,
-        r.photo_uri,
-        r.photo_width,
-        r.photo_height,
-        r.grade,
-        r.attempts,
-        r.completed,
-        r.notes,
-        r.climbed_at,
-        r.created_at,
-        r.updated_at,
-        g.name AS gym_name,
-        g.normalized_name AS gym_normalized_name,
-        g.created_at AS gym_created_at,
-        g.updated_at AS gym_updated_at,
-        rt.tag_id
-      FROM boulder_routes r
-      JOIN gyms g ON g.id = r.gym_id
-      LEFT JOIN route_tags rt ON rt.route_id = r.id
-      ${where}
-      ORDER BY r.climbed_at DESC, r.created_at DESC, r.id DESC
-    `,
-    params,
-  );
-  return mapRoutes(rows);
-}
-
-export async function getGyms(): Promise<Gym[]> {
-  const rows = await getDatabase().getAllAsync<GymRow>('SELECT * FROM gyms ORDER BY name COLLATE NOCASE ASC');
-  return rows.map(mapGym);
-}
-
-export async function findOrCreateGym(name: string): Promise<Gym> {
-  const database = getDatabase();
-  const displayName = formatGymName(name);
-  const normalizedName = normalizeGymName(name);
-  const existing = await database.getFirstAsync<GymRow>('SELECT * FROM gyms WHERE normalized_name = ?', [normalizedName]);
-  if (existing) return mapGym(existing);
-
-  const now = Date.now();
-  const result = await database.runAsync(
-    'INSERT INTO gyms (name, normalized_name, created_at, updated_at) VALUES (?, ?, ?, ?)',
-    [displayName, normalizedName, now, now],
-  );
+function mapRoute(row: RouteJoinRow): RouteWithGym {
   return {
-    id: result.lastInsertRowId,
-    name: displayName,
-    normalizedName,
-    createdAt: now,
-    updatedAt: now,
+    id: row.id,
+    name: row.name,
+    gymId: row.gym_id,
+    photoUri: row.photo_uri,
+    photoWidth: row.photo_width,
+    photoHeight: row.photo_height,
+    grade: row.grade,
+    completed: row.completed === 1,
+    notes: row.notes,
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    gym: {
+      id: row.gym_id,
+      name: row.gym_name,
+      normalizedName: row.gym_normalized_name,
+      createdAt: row.gym_created_at,
+      updatedAt: row.gym_updated_at,
+    },
   };
 }
 
-export async function createRoute(input: RouteInput): Promise<RouteWithRelations> {
-  const validation = validateRouteInput(input);
-  if (!validation.valid) {
-    throw new Error(Object.values(validation.errors)[0] ?? 'Route is invalid.');
+/**
+ * Resolve a gym by its normalized name, creating it if absent. Returns the
+ * gym id. The display name is refreshed on hit so the latest casing wins.
+ */
+async function upsertGym(gymName: string, now: number): Promise<number> {
+  const db = getDatabase();
+  const display = formatGymName(gymName);
+  const normalized = normalizeGymName(gymName);
+
+  const existing = await db.getFirstAsync<{ id: number }>(
+    'SELECT id FROM gyms WHERE normalized_name = ?',
+    [normalized],
+  );
+  if (existing !== null) {
+    await db.runAsync('UPDATE gyms SET name = ?, updated_at = ? WHERE id = ?', [
+      display,
+      now,
+      existing.id,
+    ]);
+    return existing.id;
   }
 
-  const database = getDatabase();
-  const gym = await findOrCreateGym(input.gymName);
-  const now = Date.now();
-  await database.execAsync('BEGIN TRANSACTION');
-  try {
-    const result = await database.runAsync(
-      `
-        INSERT INTO boulder_routes (
-          name, gym_id, photo_asset_id, photo_uri, photo_width, photo_height, grade,
-          attempts, completed, notes, climbed_at, created_at, updated_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      [
-        input.name.trim(),
-        gym.id,
-        input.photo?.assetId ?? null,
-        input.photo?.uri ?? null,
-        input.photo?.width ?? null,
-        input.photo?.height ?? null,
-        input.grade,
-        input.attempts,
-        input.completed ? 1 : 0,
-        input.notes?.trim() === '' ? null : input.notes ?? null,
-        input.climbedAt,
-        now,
-        now,
-      ],
-    );
-    for (const tagId of input.tagIds) {
-      await database.runAsync('INSERT INTO route_tags (route_id, tag_id) VALUES (?, ?)', [result.lastInsertRowId, tagId]);
-    }
-    await database.execAsync('COMMIT');
-    const route = await getRouteById(result.lastInsertRowId);
-    if (route === null) throw new Error('Created route could not be loaded.');
-    return route;
-  } catch (error) {
-    await database.execAsync('ROLLBACK');
-    throw error;
-  }
+  const result = await db.runAsync(
+    'INSERT INTO gyms (name, normalized_name, created_at, updated_at) VALUES (?, ?, ?, ?)',
+    [display, normalized, now, now],
+  );
+  return result.lastInsertRowId;
 }
 
-export async function updateRoute(id: number, input: RouteInput): Promise<RouteWithRelations> {
-  const validation = validateRouteInput(input);
-  if (!validation.valid) {
-    throw new Error(Object.values(validation.errors)[0] ?? 'Route is invalid.');
-  }
+async function getRouteByIdOrThrow(id: number): Promise<RouteWithGym> {
+  const route = await getRouteById(id);
+  if (route === null) throw new Error(`Route ${id} not found after write`);
+  return route;
+}
 
-  const database = getDatabase();
-  const gym = await findOrCreateGym(input.gymName);
+export async function createRoute(input: RouteInput): Promise<RouteWithGym> {
+  const db = getDatabase();
   const now = Date.now();
-  await database.execAsync('BEGIN TRANSACTION');
-  try {
-    await database.runAsync(
-      `
-        UPDATE boulder_routes
-        SET name = ?,
-            gym_id = ?,
-            photo_asset_id = ?,
-            photo_uri = ?,
-            photo_width = ?,
-            photo_height = ?,
-            grade = ?,
-            attempts = ?,
-            completed = ?,
-            notes = ?,
-            climbed_at = ?,
-            updated_at = ?
-        WHERE id = ?
-      `,
-      [
-        input.name.trim(),
-        gym.id,
-        input.photo?.assetId ?? null,
-        input.photo?.uri ?? null,
-        input.photo?.width ?? null,
-        input.photo?.height ?? null,
-        input.grade,
-        input.attempts,
-        input.completed ? 1 : 0,
-        input.notes?.trim() === '' ? null : input.notes ?? null,
-        input.climbedAt,
-        now,
-        id,
-      ],
-    );
-    await database.runAsync('DELETE FROM route_tags WHERE route_id = ?', [id]);
-    for (const tagId of input.tagIds) {
-      await database.runAsync('INSERT INTO route_tags (route_id, tag_id) VALUES (?, ?)', [id, tagId]);
-    }
-    await database.execAsync('COMMIT');
-    const route = await getRouteById(id);
-    if (route === null) throw new Error('Updated route could not be loaded.');
-    return route;
-  } catch (error) {
-    await database.execAsync('ROLLBACK');
-    throw error;
-  }
+  const gymId = await upsertGym(input.gymName, now);
+  const result = await db.runAsync(
+    `INSERT INTO routes
+       (name, gym_id, photo_uri, photo_width, photo_height, grade, completed,
+        notes, started_at, completed_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      input.name ?? null,
+      gymId,
+      input.photoUri ?? null,
+      input.photoWidth ?? null,
+      input.photoHeight ?? null,
+      input.grade ?? null,
+      input.completed ? 1 : 0,
+      input.notes ?? null,
+      input.startedAt ?? null,
+      input.completedAt ?? null,
+      now,
+      now,
+    ],
+  );
+  return getRouteByIdOrThrow(result.lastInsertRowId);
+}
+
+export async function updateRoute(id: number, input: RouteInput): Promise<RouteWithGym> {
+  const db = getDatabase();
+  const now = Date.now();
+  const gymId = await upsertGym(input.gymName, now);
+  await db.runAsync(
+    `UPDATE routes SET
+       name = ?, gym_id = ?, photo_uri = ?, photo_width = ?, photo_height = ?,
+       grade = ?, completed = ?, notes = ?, started_at = ?, completed_at = ?,
+       updated_at = ?
+     WHERE id = ?`,
+    [
+      input.name ?? null,
+      gymId,
+      input.photoUri ?? null,
+      input.photoWidth ?? null,
+      input.photoHeight ?? null,
+      input.grade ?? null,
+      input.completed ? 1 : 0,
+      input.notes ?? null,
+      input.startedAt ?? null,
+      input.completedAt ?? null,
+      now,
+      id,
+    ],
+  );
+  return getRouteByIdOrThrow(id);
 }
 
 export async function deleteRoute(id: number): Promise<void> {
-  await getDatabase().runAsync('DELETE FROM boulder_routes WHERE id = ?', [id]);
+  const db = getDatabase();
+  await db.runAsync('DELETE FROM routes WHERE id = ?', [id]);
 }
 
-export async function getRouteById(id: number): Promise<RouteWithRelations | null> {
-  const routes = await getRouteRows('WHERE r.id = ?', [id]);
-  return routes[0] ?? null;
+export async function getRouteById(id: number): Promise<RouteWithGym | null> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<RouteJoinRow>(`${ROUTE_SELECT} WHERE r.id = ?`, [id]);
+  return row === null ? null : mapRoute(row);
 }
 
-export async function getRoutes(filters: RouteFilters = {}): Promise<RouteWithRelations[]> {
+export async function getRoutes(filters: RouteFilters = {}): Promise<RouteWithGym[]> {
+  const db = getDatabase();
   const clauses: string[] = [];
-  const params: SQLiteBindValue[] = [];
-
-  if (filters.searchQuery?.trim()) {
-    clauses.push('r.name LIKE ?');
-    params.push(`%${filters.searchQuery.trim()}%`);
+  const params: (number | string)[] = [];
+  if (filters.completed !== undefined) {
+    clauses.push('r.completed = ?');
+    params.push(filters.completed ? 1 : 0);
   }
-  if (filters.gymId !== undefined && filters.gymId !== null) {
+  if (filters.gymId !== undefined) {
     clauses.push('r.gym_id = ?');
     params.push(filters.gymId);
   }
-  if (filters.completedFilter === 'completed') {
-    clauses.push('r.completed = 1');
-  } else if (filters.completedFilter === 'not_completed') {
-    clauses.push('r.completed = 0');
-  }
-
   const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
-  let routes = await getRouteRows(where, params);
-  if (filters.tagIds && filters.tagIds.length > 0) {
-    routes = routes.filter((route) => filters.tagIds?.every((tagId) => route.tags.includes(tagId)));
-  }
-  return routes;
+  const rows = await db.getAllAsync<RouteJoinRow>(
+    `${ROUTE_SELECT} ${where} ORDER BY r.created_at DESC`,
+    params,
+  );
+  return rows.map(mapRoute);
 }
 
-export async function getRoutesForMonth(year: number, month: number): Promise<RouteWithRelations[]> {
-  const { start, end } = getMonthRange(year, month);
-  return getRouteRows('WHERE r.climbed_at BETWEEN ? AND ?', [start, end]);
+export async function getProjects(): Promise<RouteWithGym[]> {
+  return getRoutes({ completed: false });
+}
+
+export async function getGyms(): Promise<Gym[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<GymRow>('SELECT * FROM gyms ORDER BY name COLLATE NOCASE ASC');
+  return rows.map(mapGym);
+}
+
+export async function getRoutesInRange(startMs: number, endMs: number): Promise<RouteWithGym[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<RouteJoinRow>(
+    `${ROUTE_SELECT} WHERE r.created_at >= ? AND r.created_at <= ? ORDER BY r.created_at DESC`,
+    [startMs, endMs],
+  );
+  return rows.map(mapRoute);
 }
 
 export async function resetAllData(): Promise<void> {
-  const database = getDatabase();
-  await database.execAsync('BEGIN TRANSACTION');
-  try {
-    await database.runAsync('DELETE FROM route_tags');
-    await database.runAsync('DELETE FROM boulder_routes');
-    await database.runAsync('DELETE FROM gyms');
-    await database.execAsync('COMMIT');
-  } catch (error) {
-    await database.execAsync('ROLLBACK');
-    throw error;
-  }
+  const db = getDatabase();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM routes', []);
+    await db.runAsync('DELETE FROM gyms', []);
+  });
 }

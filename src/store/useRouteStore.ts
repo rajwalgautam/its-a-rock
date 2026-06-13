@@ -1,154 +1,104 @@
 import { create } from 'zustand';
+import type { Gym, RouteInput, RouteWithGym } from '@/types';
 import {
   createRoute,
   deleteRoute,
   getGyms,
+  getProjects,
   getRouteById,
   getRoutes,
-  getRoutesForMonth,
   resetAllData,
   updateRoute,
 } from '@/db/queries';
-import {
-  CompletedFilter,
-  DailyRouteStats,
-  Gym,
-  RouteInput,
-  RouteTagId,
-  RouteWithRelations,
-  SummaryStats,
-} from '@/types';
-import { buildDailyStats, buildSummaryStats } from '@/utils/routeStats';
 
-interface RouteStoreState {
-  routes: RouteWithRelations[];
+// Weekly stats live on this store too (see docs/BLUEPRINT.md §7) but the
+// computation (routeStats) is added with the My Climbing work — issue #29.
+
+interface RouteState {
+  routes: RouteWithGym[];
+  projects: RouteWithGym[];
   gyms: Gym[];
-  monthRoutes: RouteWithRelations[];
-  monthStats: Record<string, DailyRouteStats>;
-  summaryStats: SummaryStats;
   isLoading: boolean;
   error: string | null;
-  searchQuery: string;
-  selectedGymId: number | null;
-  completedFilter: CompletedFilter;
-  selectedTagIds: RouteTagId[];
   loadRoutes: () => Promise<void>;
+  loadProjects: () => Promise<void>;
   loadGyms: () => Promise<void>;
-  loadMonth: (year: number, month: number) => Promise<void>;
-  getRoute: (id: number) => Promise<RouteWithRelations | null>;
-  addRoute: (input: RouteInput) => Promise<RouteWithRelations>;
-  editRoute: (id: number, input: RouteInput) => Promise<RouteWithRelations>;
+  getRoute: (id: number) => Promise<RouteWithGym | null>;
+  addRoute: (input: RouteInput) => Promise<RouteWithGym>;
+  editRoute: (id: number, input: RouteInput) => Promise<RouteWithGym>;
   removeRoute: (id: number) => Promise<void>;
   clearAll: () => Promise<void>;
-  setSearchQuery: (query: string) => void;
-  setSelectedGymId: (gymId: number | null) => void;
-  setCompletedFilter: (filter: CompletedFilter) => void;
-  toggleTagFilter: (tagId: RouteTagId) => void;
-  clearFilters: () => void;
 }
 
-const EMPTY_SUMMARY = buildSummaryStats([]);
-
-export const useRouteStore = create<RouteStoreState>((set, get) => ({
+export const useRouteStore = create<RouteState>((set, get) => ({
   routes: [],
+  projects: [],
   gyms: [],
-  monthRoutes: [],
-  monthStats: {},
-  summaryStats: EMPTY_SUMMARY,
   isLoading: false,
   error: null,
-  searchQuery: '',
-  selectedGymId: null,
-  completedFilter: 'all',
-  selectedTagIds: [],
 
-  async loadRoutes() {
+  loadRoutes: async () => {
     set({ isLoading: true, error: null });
     try {
-      const state = get();
-      const routes = await getRoutes({
-        searchQuery: state.searchQuery,
-        gymId: state.selectedGymId,
-        completedFilter: state.completedFilter,
-        tagIds: state.selectedTagIds,
-      });
-      set({ routes, summaryStats: buildSummaryStats(routes), isLoading: false });
-    } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Could not load routes.', isLoading: false });
+      const routes = await getRoutes();
+      set({ routes, isLoading: false });
+    } catch (e) {
+      set({ error: errMessage(e), isLoading: false });
     }
   },
 
-  async loadGyms() {
-    set({ gyms: await getGyms() });
+  loadProjects: async () => {
+    set({ error: null });
+    try {
+      const projects = await getProjects();
+      set({ projects });
+    } catch (e) {
+      set({ error: errMessage(e) });
+    }
   },
 
-  async loadMonth(year, month) {
-    const routes = await getRoutesForMonth(year, month);
-    set({
-      monthRoutes: routes,
-      monthStats: buildDailyStats(routes),
-      summaryStats: buildSummaryStats(routes),
-    });
+  loadGyms: async () => {
+    set({ error: null });
+    try {
+      const gyms = await getGyms();
+      set({ gyms });
+    } catch (e) {
+      set({ error: errMessage(e) });
+    }
   },
 
-  async getRoute(id) {
+  getRoute: async (id) => {
     return getRouteById(id);
   },
 
-  async addRoute(input) {
+  addRoute: async (input) => {
     const route = await createRoute(input);
-    await Promise.all([get().loadRoutes(), get().loadGyms()]);
+    await refresh(get);
     return route;
   },
 
-  async editRoute(id, input) {
+  editRoute: async (id, input) => {
     const route = await updateRoute(id, input);
-    await Promise.all([get().loadRoutes(), get().loadGyms()]);
+    await refresh(get);
     return route;
   },
 
-  async removeRoute(id) {
+  removeRoute: async (id) => {
     await deleteRoute(id);
-    await get().loadRoutes();
+    await refresh(get);
   },
 
-  async clearAll() {
+  clearAll: async () => {
     await resetAllData();
-    set({
-      routes: [],
-      gyms: [],
-      monthRoutes: [],
-      monthStats: {},
-      summaryStats: EMPTY_SUMMARY,
-    });
-  },
-
-  setSearchQuery(query) {
-    set({ searchQuery: query });
-  },
-
-  setSelectedGymId(gymId) {
-    set({ selectedGymId: gymId });
-  },
-
-  setCompletedFilter(filter) {
-    set({ completedFilter: filter });
-  },
-
-  toggleTagFilter(tagId) {
-    set((state) => ({
-      selectedTagIds: state.selectedTagIds.includes(tagId)
-        ? state.selectedTagIds.filter((id) => id !== tagId)
-        : [...state.selectedTagIds, tagId],
-    }));
-  },
-
-  clearFilters() {
-    set({
-      searchQuery: '',
-      selectedGymId: null,
-      completedFilter: 'all',
-      selectedTagIds: [],
-    });
+    set({ routes: [], projects: [], gyms: [] });
   },
 }));
+
+/** Re-read the lists that a mutation can affect. */
+async function refresh(get: () => RouteState): Promise<void> {
+  await Promise.all([get().loadRoutes(), get().loadProjects(), get().loadGyms()]);
+}
+
+function errMessage(e: unknown): string {
+  return e instanceof Error ? e.message : 'Unknown error';
+}
