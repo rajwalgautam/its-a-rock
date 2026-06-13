@@ -14,7 +14,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~55.0.23",
     "expo-constants": "~55.0.16",
-    "expo-file-system": "^56.0.8",
+    "expo-file-system": "~55.0.14",
     "expo-haptics": "^55.0.14",
     "expo-image-picker": "~55.0.14",
     "expo-intent-launcher": "^56.0.4",
