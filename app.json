@@ -2,7 +2,7 @@
   "expo": {
     "name": "It's A Rock",
     "slug": "its-a-rock",
-    "version": "0.3.0",
+    "version": "0.4.2",
     "scheme": "itsarock",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",

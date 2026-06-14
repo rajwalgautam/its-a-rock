@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import * as MediaLibrary from 'expo-media-library';
 import { Alert, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useState } from 'react';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
@@ -50,25 +49,12 @@ export function PhotoPickerField({ value, onChange }: PhotoPickerFieldProps): Re
     const asset = result.assets[0];
     if (asset === undefined) return;
 
-    const libraryPerm = await MediaLibrary.requestPermissionsAsync();
-    if (!libraryPerm.granted) {
-      Alert.alert('Permission needed', 'Allow access to save photos to your library.');
-      return;
-    }
-
-    try {
-      const savedAsset = await MediaLibrary.createAssetAsync(asset.uri);
-      const photoUri = savedAsset.uri;
-      onChange({
-        uri: photoUri,
-        width: asset.width ?? null,
-        height: asset.height ?? null,
-      });
-      setShowEditMenu(false);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save photo to library.');
-      console.error('Failed to save photo:', error);
-    }
+    onChange({
+      uri: asset.uri,
+      width: asset.width ?? null,
+      height: asset.height ?? null,
+    });
+    setShowEditMenu(false);
   }
 
   function apply(result: ImagePicker.ImagePickerResult): void {

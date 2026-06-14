@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
@@ -23,6 +23,7 @@ export function LocationPickerField({
   const loadGyms = useRouteStore((s) => s.loadGyms);
   const loadRoutes = useRouteStore((s) => s.loadRoutes);
   const [showDropdown, setShowDropdown] = useState(false);
+  const initializedRef = useRef(false);
 
   useEffect(() => {
     void loadGyms();
@@ -30,13 +31,14 @@ export function LocationPickerField({
   }, [loadGyms, loadRoutes]);
 
   useEffect(() => {
-    if (value.length === 0 && routes.length > 0) {
+    if (!initializedRef.current && value.length === 0 && routes.length > 0) {
       const lastRoute = routes[routes.length - 1];
       if (lastRoute?.gym.name) {
         onChange(lastRoute.gym.name);
+        initializedRef.current = true;
       }
     }
-  }, [routes, value, onChange]);
+  }, [routes, onChange]);
 
   const suggestions = gyms
     .filter(

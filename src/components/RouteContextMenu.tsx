@@ -20,7 +20,7 @@ const MENU_WIDTH = 200;
 
 export function RouteContextMenu({ visible, route, position, onDismiss, onEdit }: RouteContextMenuProps): React.JSX.Element {
   const { colors } = useTheme();
-  const { height: screenHeight } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const editRoute = useRouteStore((s) => s.editRoute);
   const removeRoute = useRouteStore((s) => s.removeRoute);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -57,14 +57,14 @@ export function RouteContextMenu({ visible, route, position, onDismiss, onEdit }
     onDismiss();
   }, [route, onEdit, onDismiss]);
 
-  if (!route || !position) return <></>;
+  if (!visible || !route || !position) return <></>;
 
   const markCompletedLabel = route.completed ? 'Mark Incomplete' : 'Mark Completed';
 
   // Determine if menu should appear above or below the tile
   const showAbove = position.y > screenHeight / 2;
   const menuTop = showAbove ? position.y - MENU_HEIGHT - SPACING.sm : position.y + SPACING.sm;
-  const menuLeft = Math.max(SPACING.md, Math.min(position.x - MENU_WIDTH / 2, screenHeight - MENU_WIDTH - SPACING.md));
+  const menuLeft = Math.max(SPACING.md, Math.min(position.x - MENU_WIDTH / 2, screenWidth - MENU_WIDTH - SPACING.md));
 
   if (showDeleteConfirm) {
     return (
@@ -160,7 +160,11 @@ function MenuItem({ label, icon, onPress, colors, isDangerous }: MenuItemProps):
 
 const styles = StyleSheet.create({
   backdrop: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   menu: {

@@ -56,7 +56,7 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
         <View
           style={[
             styles.statusPill,
-            { backgroundColor: current.completed ? colors.success : colors.warning },
+            { backgroundColor: current.completed ? colors.primary : colors.success },
           ]}
         >
           <Text style={styles.statusText}>{statusLabel(current.completed)}</Text>
