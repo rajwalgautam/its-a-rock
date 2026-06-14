@@ -1,16 +1,19 @@
 import { useState } from 'react';
 import {
+  Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { GradePicker } from '@/components/GradePicker';
 import { PhotoPickerField, type PhotoValue } from '@/components/PhotoPickerField';
+import { LocationPickerField } from '@/components/LocationPickerField';
 import { formatDate } from '@/utils/formatters';
 import { validateRouteInput } from '@/utils/validators';
 import type { RouteInput, RouteWithGym } from '@/types';
@@ -78,6 +81,7 @@ export function RouteForm({
   const [state, setState] = useState<FormState>(() => toState(initial));
   const [errors, setErrors] = useState<ReturnType<typeof validateRouteInput>['errors']>({});
   const [saving, setSaving] = useState(false);
+  const [datePickerField, setDatePickerField] = useState<'started' | 'completed' | null>(null);
 
   function patch(p: Partial<FormState>): void {
     setState((prev) => ({ ...prev, ...p }));
@@ -114,13 +118,7 @@ export function RouteForm({
       </Field>
 
       <Field label="Gym / location" required error={errors.gymName}>
-        <TextInput
-          value={state.gymName}
-          onChangeText={(gymName) => patch({ gymName })}
-          placeholder="Movement Englewood or Denver, CO"
-          placeholderTextColor={colors.textMuted}
-          style={[styles.input, inputColors(colors)]}
-        />
+        <LocationPickerField value={state.gymName} onChange={(gymName) => patch({ gymName })} />
       </Field>
 
       <Field label="Name (optional)">
@@ -137,30 +135,37 @@ export function RouteForm({
         <GradePicker value={state.grade} onChange={(grade) => patch({ grade })} />
       </Field>
 
-      <Field label="Status">
-        <View style={styles.switchRow}>
-          <Text style={[styles.switchLabel, { color: colors.textSecondary }]}>
-            {state.completed ? 'Sent' : 'Project'}
+      <Field label="">
+        <Pressable
+          onPress={() => toggleCompleted(!state.completed)}
+          style={styles.checkboxRow}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: state.completed }}
+        >
+          <View style={[styles.checkbox, { borderColor: colors.border, backgroundColor: state.completed ? colors.primary : 'transparent' }]}>
+            {state.completed && (
+              <Ionicons name="checkmark" size={16} color={colors.onPrimary} />
+            )}
+          </View>
+          <Text style={[styles.checkboxLabel, { color: colors.textPrimary }]}>
+            Completed
           </Text>
-          <Switch
-            value={state.completed}
-            onValueChange={toggleCompleted}
-            trackColor={{ true: colors.primary, false: colors.border }}
-          />
-        </View>
+        </Pressable>
       </Field>
 
       <Field label="Dates" error={errors.dates}>
-        <DateField
+        <DatePickerButton
           label="Started"
           value={state.startedAt}
-          onChange={(startedAt) => patch({ startedAt })}
+          onPress={() => setDatePickerField('started')}
         />
-        <DateField
-          label="Sent"
-          value={state.completedAt}
-          onChange={(completedAt) => patch({ completedAt })}
-        />
+        {state.completed && (
+          <DatePickerButton
+            label="Completed"
+            value={state.completedAt}
+            onPress={() => setDatePickerField('completed')}
+          />
+        )}
       </Field>
 
       <Field label="Notes (optional)">
@@ -193,6 +198,20 @@ export function RouteForm({
           </Text>
         </Pressable>
       </View>
+
+      <DatePickerModal
+        isVisible={datePickerField !== null}
+        value={datePickerField === 'started' ? state.startedAt : state.completedAt}
+        onConfirm={(date) => {
+          if (datePickerField === 'started') {
+            patch({ startedAt: date });
+          } else if (datePickerField === 'completed') {
+            patch({ completedAt: date });
+          }
+          setDatePickerField(null);
+        }}
+        onCancel={() => setDatePickerField(null)}
+      />
     </View>
   );
 }
@@ -223,31 +242,83 @@ function Field({
   );
 }
 
-function DateField({
+function DatePickerButton({
   label,
   value,
-  onChange,
+  onPress,
 }: {
   label: string;
   value: number | null;
-  onChange: (value: number | null) => void;
+  onPress: () => void;
 }): React.JSX.Element {
   const { colors } = useTheme();
   return (
-    <View style={styles.dateRow}>
-      <Text style={[styles.dateLabel, { color: colors.textSecondary }]}>{label}</Text>
-      <Text style={[styles.dateValue, { color: colors.textPrimary }]}>
-        {value !== null ? formatDate(value) : '—'}
-      </Text>
-      <Pressable onPress={() => onChange(Date.now())} hitSlop={6}>
-        <Text style={[styles.dateAction, { color: colors.primary }]}>Today</Text>
-      </Pressable>
-      {value !== null && (
-        <Pressable onPress={() => onChange(null)} hitSlop={6}>
-          <Text style={[styles.dateAction, { color: colors.textMuted }]}>Clear</Text>
+    <Pressable
+      onPress={onPress}
+      style={[styles.dateButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+    >
+      <View style={styles.dateButtonContent}>
+        <Text style={[styles.dateButtonLabel, { color: colors.textSecondary }]}>{label}</Text>
+        <Text style={[styles.dateButtonValue, { color: colors.textPrimary }]}>
+          {value !== null ? formatDate(value) : '—'}
+        </Text>
+      </View>
+      <Ionicons name="calendar-outline" size={20} color={colors.textMuted} />
+    </Pressable>
+  );
+}
+
+function DatePickerModal({
+  isVisible,
+  value,
+  onConfirm,
+  onCancel,
+}: {
+  isVisible: boolean;
+  value: number | null;
+  onConfirm: (date: number) => void;
+  onCancel: () => void;
+}): React.JSX.Element {
+  const { colors } = useTheme();
+  const [tempDate, setTempDate] = useState(new Date(value ?? Date.now()));
+
+  function changeDay(delta: number): void {
+    const newDate = new Date(tempDate);
+    newDate.setDate(newDate.getDate() + delta);
+    if (newDate <= new Date()) {
+      setTempDate(newDate);
+    }
+  }
+
+  return (
+    <Modal visible={isVisible} transparent animationType="fade">
+      <Pressable style={styles.modalBackdrop} onPress={onCancel} />
+      <View style={[styles.pickerContainer, { backgroundColor: colors.surface }]}>
+        <View style={[styles.pickerHeader, { borderBottomColor: colors.border }]}>
+          <Pressable onPress={onCancel} hitSlop={8}>
+            <Text style={[styles.pickerAction, { color: colors.primary }]}>Cancel</Text>
+          </Pressable>
+          <Text style={[styles.pickerTitle, { color: colors.textPrimary }]}>Select date</Text>
+          <Pressable onPress={() => onConfirm(tempDate.getTime())} hitSlop={8}>
+            <Text style={[styles.pickerAction, { color: colors.primary, fontWeight: '700' }]}>Done</Text>
+          </Pressable>
+        </View>
+        <View style={styles.dateControlsRow}>
+          <Pressable onPress={() => changeDay(-1)} style={[styles.dateBtn, { backgroundColor: colors.surfaceAlt }]}>
+            <Ionicons name="chevron-back" size={24} color={colors.textSecondary} />
+          </Pressable>
+          <Text style={[styles.selectedDate, { color: colors.textPrimary }]}>
+            {formatDate(tempDate.getTime())}
+          </Text>
+          <Pressable onPress={() => changeDay(1)} style={[styles.dateBtn, { backgroundColor: colors.surfaceAlt }]}>
+            <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
+          </Pressable>
+        </View>
+        <Pressable onPress={() => setTempDate(new Date())} style={[styles.todayBtn, { backgroundColor: colors.primary }]}>
+          <Text style={[styles.todayBtnText, { color: colors.onPrimary }]}>Today</Text>
         </Pressable>
-      )}
-    </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -286,31 +357,102 @@ const styles = StyleSheet.create({
     minHeight: 88,
     textAlignVertical: 'top',
   },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  switchLabel: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600',
-  },
-  dateRow: {
+  checkboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.md,
-    paddingVertical: SPACING.xs,
   },
-  dateLabel: {
-    fontSize: FONT_SIZE.sm,
-    width: 60,
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: RADIUS.sm,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  dateValue: {
+  checkboxLabel: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+  },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
+  dateButtonContent: {
     flex: 1,
+  },
+  dateButtonLabel: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+    marginBottom: SPACING.xs,
+  },
+  dateButtonValue: {
     fontSize: FONT_SIZE.md,
   },
-  dateAction: {
-    fontSize: FONT_SIZE.sm,
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  pickerContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: RADIUS.lg,
+    borderTopRightRadius: RADIUS.lg,
+    paddingBottom: SPACING.lg,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+  },
+  pickerTitle: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+  },
+  pickerAction: {
+    fontSize: FONT_SIZE.md,
+  },
+  dateControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.md,
+    paddingVertical: SPACING.lg,
+  },
+  dateBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedDate: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '600',
+    minWidth: 120,
+    textAlign: 'center',
+  },
+  todayBtn: {
+    marginHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+  },
+  todayBtnText: {
+    fontSize: FONT_SIZE.md,
     fontWeight: '700',
   },
   actions: {

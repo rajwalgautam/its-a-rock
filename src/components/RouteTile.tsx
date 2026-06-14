@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
-import { formatGradeLabel } from '@/utils/formatters';
+import { formatGradeLabel, formatShortDate } from '@/utils/formatters';
 import type { RouteWithGym } from '@/types';
 
 interface RouteTileProps {
@@ -18,6 +18,13 @@ export function RouteTile({ route, size, onPress, onLongPress }: RouteTileProps)
   const { colors } = useTheme();
   const hasPhoto = route.photoUri !== null && route.photoUri.length > 0;
   const smallFont = size < 130;
+
+  const getStatusColor = (): string => {
+    if (route.completed) return colors.success; // Orange/success for completed
+    return colors.textMuted; // Yellow-ish for incomplete (using muted, can be overridden)
+  };
+
+  const displayDate = route.startedAt ?? route.completedAt;
 
   return (
     <Pressable
@@ -45,12 +52,25 @@ export function RouteTile({ route, size, onPress, onLongPress }: RouteTileProps)
       )}
 
       <View style={[styles.overlay, { backgroundColor: colors.overlay }]}>
-        <Text
-          style={[styles.grade, { color: colors.onOverlay, fontSize: smallFont ? FONT_SIZE.sm : FONT_SIZE.md }]}
-          numberOfLines={1}
-        >
-          {formatGradeLabel(route.grade)}
-        </Text>
+        <View style={styles.topRow}>
+          <View style={styles.gradeWithDot}>
+            <View style={[styles.statusDot, { backgroundColor: getStatusColor() }]} />
+            <Text
+              style={[styles.grade, { color: colors.onOverlay, fontSize: smallFont ? FONT_SIZE.sm : FONT_SIZE.md }]}
+              numberOfLines={1}
+            >
+              {formatGradeLabel(route.grade)}
+            </Text>
+          </View>
+          {displayDate !== null && (
+            <Text
+              style={[styles.date, { color: colors.onOverlay, fontSize: smallFont ? FONT_SIZE.xs : FONT_SIZE.sm }]}
+              numberOfLines={1}
+            >
+              {formatShortDate(displayDate)}
+            </Text>
+          )}
+        </View>
         <Text style={[styles.location, { color: colors.onOverlay }]} numberOfLines={1}>
           {route.gym.name}
         </Text>
@@ -90,9 +110,32 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
+    gap: SPACING.xs,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  gradeWithDot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    flex: 1,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: RADIUS.full,
+    flexShrink: 0,
   },
   grade: {
     fontWeight: '800',
+    flex: 1,
+  },
+  date: {
+    opacity: 0.9,
+    flexShrink: 0,
   },
   location: {
     fontSize: FONT_SIZE.xs,

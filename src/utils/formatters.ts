@@ -21,3 +21,17 @@ export function formatGradeLabel(grade: string | null | undefined): string {
     ? grade.trim()
     : 'Ungraded';
 }
+
+/** Short date format: "Jun 13" for current year, "Jun 13 2025" for other years. */
+export function formatShortDate(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined) return '';
+  const d = new Date(ms);
+  if (isNaN(d.getTime())) return '';
+  const now = new Date();
+  const isCurrentYear = d.getFullYear() === now.getFullYear();
+  return d.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: isCurrentYear ? undefined : 'numeric',
+  });
+}

@@ -13,6 +13,8 @@ export interface PhotoValue {
 interface PhotoPickerFieldProps {
   value: PhotoValue | null;
   onChange: (value: PhotoValue | null) => void;
+  /** If true, hide the picker buttons when a photo is already selected. */
+  hideButtonsWhenSelected?: boolean;
 }
 
 const PICK_OPTIONS: ImagePicker.ImagePickerOptions = {
@@ -22,8 +24,9 @@ const PICK_OPTIONS: ImagePicker.ImagePickerOptions = {
 };
 
 /** Pick from the library or take a photo; stores a local URI + dimensions. */
-export function PhotoPickerField({ value, onChange }: PhotoPickerFieldProps): React.JSX.Element {
+export function PhotoPickerField({ value, onChange, hideButtonsWhenSelected }: PhotoPickerFieldProps): React.JSX.Element {
   const { colors } = useTheme();
+  const showButtons = !hideButtonsWhenSelected || value === null;
 
   async function pickFromLibrary(): Promise<void> {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -70,10 +73,12 @@ export function PhotoPickerField({ value, onChange }: PhotoPickerFieldProps): Re
         </View>
       )}
 
-      <View style={styles.actions}>
-        <PickerButton icon="images-outline" label="Library" onPress={() => void pickFromLibrary()} />
-        <PickerButton icon="camera-outline" label="Camera" onPress={() => void takePhoto()} />
-      </View>
+      {showButtons && (
+        <View style={styles.actions}>
+          <PickerButton icon="images-outline" label="Library" onPress={() => void pickFromLibrary()} />
+          <PickerButton icon="camera-outline" label="Camera" onPress={() => void takePhoto()} />
+        </View>
+      )}
     </View>
   );
 }
