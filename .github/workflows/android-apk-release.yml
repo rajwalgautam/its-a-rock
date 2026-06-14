@@ -234,8 +234,7 @@ jobs:
             printf 'Release %s\n' "${VERSION}" > /tmp/release-notes.md
           else
             LINK="**Changelog:** [${CHANGELOG}](https://github.com/${REPO}/blob/${VERSION}/${CHANGELOG})"
-            printf '%s\n\n---\n\n' "$LINK" > /tmp/release-notes.md
-            sed '/^## Under the hood/,$d' "$CHANGELOG" | sed 's/[[:space:]]*$//' >> /tmp/release-notes.md
+            printf '%s\n' "$LINK" > /tmp/release-notes.md
           fi
 
       - name: Publish release to its-a-rock
