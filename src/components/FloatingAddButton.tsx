@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   menuLabel: {
-    fontSize: FONT_SIZE.md,
+    fontSize: FONT_SIZE.lg,
     fontWeight: '500',
     flex: 1,
   },
