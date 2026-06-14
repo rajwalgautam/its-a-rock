@@ -112,88 +112,10 @@ jobs:
             echo "Release version: ${VERSION}"
           fi
 
-      - name: Bump app.json version and create PR
-        if: steps.resolve.outputs.is_rerelease == 'false'
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
-        run: |
-          VERSION="${{ steps.resolve.outputs.version }}"
-          BARE="${VERSION#v}"
-          CURRENT=$(node -e "const a=require('./app.json');console.log(a.expo.version)")
-          if [ "$CURRENT" = "$BARE" ]; then
-            echo "app.json already at ${BARE} — nothing to commit"
-            exit 0
-          fi
-
-          BUMP_BRANCH="release/${VERSION}-app-bump"
-
-          # Clean up any existing bump branch from previous failed runs
-          git push origin --delete "${BUMP_BRANCH}" 2>/dev/null || true
-
-          git checkout -b "${BUMP_BRANCH}"
-
-          node -e "
-            const fs = require('fs');
-            const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
-            app.expo.version = '${BARE}';
-            fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
-          "
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add app.json
-          git commit -m "chore: bump app.json to ${BARE}"
-          git push origin "${BUMP_BRANCH}"
-
-          gh pr create \
-            --title "chore: bump app.json to ${BARE}" \
-            --body "Automated app.json version bump for release ${VERSION}" \
-            --base main \
-            --head "${BUMP_BRANCH}"
-
-      - name: Wait for PR checks and auto-merge
-        if: steps.resolve.outputs.is_rerelease == 'false'
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
-        run: |
-          VERSION="${{ steps.resolve.outputs.version }}"
-          BARE="${VERSION#v}"
-          CURRENT=$(node -e "const a=require('./app.json');console.log(a.expo.version)")
-
-          if [ "$CURRENT" = "$BARE" ]; then
-            echo "app.json already at ${BARE} — skipping PR merge"
-            exit 0
-          fi
-
-          BUMP_BRANCH="release/${VERSION}-app-bump"
-
-          # Find the PR for this branch
-          PR_NUMBER=$(gh pr list --head "${BUMP_BRANCH}" --json number --jq '.[0].number')
-          if [ -z "$PR_NUMBER" ]; then
-            echo "No PR found for ${BUMP_BRANCH}"
-            exit 1
-          fi
-
-          echo "Waiting for PR #${PR_NUMBER} checks to complete..."
-          gh pr checks "${PR_NUMBER}" --watch
-
-          echo "Auto-merging PR #${PR_NUMBER}..."
-          gh pr merge "${PR_NUMBER}" --squash --auto
-
-          echo "PR #${PR_NUMBER} merged. Waiting for sync..."
-          sleep 5
-
       - name: Create and push tag
         if: steps.resolve.outputs.is_rerelease == 'false'
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
           VERSION="${{ steps.resolve.outputs.version }}"
-
-          # Refresh from main to get the merged app.json bump
-          git fetch origin main
-          git checkout main
-          git reset --hard origin/main
 
           if git ls-remote --tags origin "refs/tags/${VERSION}" | grep -q "refs/tags/${VERSION}"; then
             git push origin ":refs/tags/${VERSION}"
@@ -247,6 +169,18 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Set app.json version for build
+        run: |
+          VERSION="${{ needs.create-tag.outputs.version }}"
+          BARE="${VERSION#v}"
+          node -e "
+            const fs = require('fs');
+            const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            app.expo.version = '${BARE}';
+            fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
+          "
+          echo "Set app.json version to ${BARE}"
 
       - name: Cache Expo prebuild
         uses: actions/cache@v4

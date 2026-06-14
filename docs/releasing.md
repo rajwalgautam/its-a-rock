@@ -18,8 +18,8 @@ local device deploy used for testing.
 
 - Versions are `vMAJOR.MINOR.PATCH` (e.g. `v0.2.0`). The leading `v` is used for
   git tags and changelog filenames; `app.json` stores the bare number (`0.2.0`).
-- **You do not edit `app.json` by hand.** The release workflow bumps it and
-  commits `chore: bump app.json to <version>` automatically.
+- **You do not edit `app.json` by hand.** The release workflow sets the version
+  during the build; `app.json` on the repo stays at `0.0.0` and is never committed.
 - One changelog file per version lives in [`changelogs/`](../changelogs), named
   `vX.Y.Z.md`.
 
@@ -94,13 +94,12 @@ over an existing install.
 The workflow then:
 
 1. Runs typecheck + the test suite (release is blocked if either fails).
-2. Bumps `app.json` to the bare version and commits it to `main` (skipped if
-   already at that version).
-3. Creates and pushes the `vX.Y.Z` git tag (an existing tag is force-replaced).
-4. Builds a signed release APK with `expo prebuild` + `gradlew assembleRelease`.
-5. Composes release notes from `changelogs/vX.Y.Z.md` (truncated at
+2. Creates and pushes the `vX.Y.Z` git tag (an existing tag is force-replaced).
+3. Builds a signed release APK with `expo prebuild` + `gradlew assembleRelease`,
+   setting the app version in `app.json` for the build (changes are not committed).
+4. Composes release notes from `changelogs/vX.Y.Z.md` (truncated at
    `## Under the hood`, with a link back to the full changelog).
-6. Publishes the APK as a GitHub Release named `vX.Y.Z` **in this repo**.
+5. Publishes the APK as a GitHub Release named `vX.Y.Z` **in this repo**.
 
 If a release with that tag already exists, the build fails fast rather than
 overwriting it.
