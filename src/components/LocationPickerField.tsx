@@ -19,12 +19,24 @@ export function LocationPickerField({
 }: LocationPickerFieldProps): React.JSX.Element {
   const { colors } = useTheme();
   const gyms = useRouteStore((s) => s.gyms);
+  const routes = useRouteStore((s) => s.routes);
   const loadGyms = useRouteStore((s) => s.loadGyms);
+  const loadRoutes = useRouteStore((s) => s.loadRoutes);
   const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
     void loadGyms();
-  }, [loadGyms]);
+    void loadRoutes();
+  }, [loadGyms, loadRoutes]);
+
+  useEffect(() => {
+    if (value.length === 0 && routes.length > 0) {
+      const lastRoute = routes[routes.length - 1];
+      if (lastRoute?.gym.name) {
+        onChange(lastRoute.gym.name);
+      }
+    }
+  }, [routes, value, onChange]);
 
   const suggestions = gyms
     .filter(
@@ -39,15 +51,24 @@ export function LocationPickerField({
 
   return (
     <View style={styles.container}>
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        onFocus={() => setShowDropdown(true)}
-        onBlur={() => setTimeout(() => setShowDropdown(false), 100)}
-        placeholder={placeholder}
-        placeholderTextColor={colors.textMuted}
-        style={[styles.input, inputColors(colors)]}
-      />
+      <View style={styles.inputWrapper}>
+        <TextInput
+          value={value}
+          onChangeText={onChange}
+          onFocus={() => setShowDropdown(true)}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 100)}
+          placeholder={placeholder}
+          placeholderTextColor={colors.textMuted}
+          style={[styles.input, inputColors(colors)]}
+        />
+        <Ionicons
+          name="chevron-down"
+          size={20}
+          color={colors.textMuted}
+          style={styles.dropdownIcon}
+          pointerEvents="none"
+        />
+      </View>
       {showDropdown && value.length > 0 && (
         <View style={[styles.dropdown, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {hasMatches ? (
@@ -61,7 +82,11 @@ export function LocationPickerField({
                     onChange(item.name);
                     setShowDropdown(false);
                   }}
-                  style={[styles.suggestion, { borderBottomColor: colors.border }]}
+                  style={({ pressed }) => [
+                    styles.suggestion,
+                    { borderBottomColor: colors.border, backgroundColor: pressed ? colors.surfaceAlt : 'transparent' },
+                  ]}
+                  hitSlop={{ top: 8, bottom: 8, left: 0, right: 0 }}
                 >
                   <Text style={[styles.suggestionText, { color: colors.textPrimary }]}>
                     {item.name}
@@ -94,12 +119,22 @@ const styles = StyleSheet.create({
   container: {
     position: 'relative',
   },
+  inputWrapper: {
+    position: 'relative',
+  },
   input: {
     borderWidth: 1,
     borderRadius: RADIUS.md,
     paddingHorizontal: SPACING.md,
+    paddingRight: 40,
     paddingVertical: SPACING.sm,
     fontSize: FONT_SIZE.md,
+  },
+  dropdownIcon: {
+    position: 'absolute',
+    right: SPACING.md,
+    top: '50%',
+    marginTop: -10,
   },
   dropdown: {
     position: 'absolute',
@@ -114,7 +149,7 @@ const styles = StyleSheet.create({
   },
   suggestion: {
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    paddingVertical: SPACING.md,
     borderBottomWidth: 1,
   },
   suggestionText: {
