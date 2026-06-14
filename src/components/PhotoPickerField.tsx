@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import { Alert, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useState } from 'react';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
@@ -37,12 +38,37 @@ export function PhotoPickerField({ value, onChange }: PhotoPickerFieldProps): Re
   }
 
   async function takePhoto(): Promise<void> {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
+    const cameraPerm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!cameraPerm.granted) {
       Alert.alert('Permission needed', 'Allow camera access to take a climb photo.');
       return;
     }
-    apply(await ImagePicker.launchCameraAsync(PICK_OPTIONS));
+
+    const result = await ImagePicker.launchCameraAsync(PICK_OPTIONS);
+    if (result.canceled) return;
+
+    const asset = result.assets[0];
+    if (asset === undefined) return;
+
+    const libraryPerm = await MediaLibrary.requestPermissionsAsync();
+    if (!libraryPerm.granted) {
+      Alert.alert('Permission needed', 'Allow access to save photos to your library.');
+      return;
+    }
+
+    try {
+      const savedAsset = await MediaLibrary.createAssetAsync(asset.uri);
+      const photoUri = savedAsset.uri;
+      onChange({
+        uri: photoUri,
+        width: asset.width ?? null,
+        height: asset.height ?? null,
+      });
+      setShowEditMenu(false);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save photo to library.');
+      console.error('Failed to save photo:', error);
+    }
   }
 
   function apply(result: ImagePicker.ImagePickerResult): void {
@@ -131,7 +157,7 @@ function EditPhotoModal({
   return (
     <Modal visible={isVisible} transparent animationType="fade">
       <Pressable style={styles.modalBackdrop} onPress={onCancel} />
-      <View style={[styles.menuContainer, { backgroundColor: colors.surface }]}>
+      <View pointerEvents="box-none" style={[styles.menuContainer, { backgroundColor: colors.surface }]}>
         <Pressable
           onPress={onLibrary}
           style={[styles.menuItem, { borderBottomColor: colors.border }]}
