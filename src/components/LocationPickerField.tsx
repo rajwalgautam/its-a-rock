@@ -63,6 +63,18 @@ export function LocationPickerField({
           placeholderTextColor={colors.textMuted}
           style={[styles.input, inputColors(colors)]}
         />
+        {value.length > 0 && (
+          <Pressable
+            onPress={() => {
+              onChange('');
+              setShowDropdown(true);
+            }}
+            style={styles.clearButton}
+            hitSlop={8}
+          >
+            <Ionicons name="close" size={20} color={colors.textMuted} />
+          </Pressable>
+        )}
         <Ionicons
           name="chevron-down"
           size={20}
@@ -131,6 +143,14 @@ const styles = StyleSheet.create({
     paddingRight: 40,
     paddingVertical: SPACING.sm,
     fontSize: FONT_SIZE.md,
+  },
+  clearButton: {
+    position: 'absolute',
+    right: SPACING.lg + 4,
+    top: '50%',
+    marginTop: -10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dropdownIcon: {
     position: 'absolute',
