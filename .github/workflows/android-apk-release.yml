@@ -144,16 +144,17 @@ jobs:
         with:
           ref: ${{ needs.create-tag.outputs.checkout_ref }}
 
-      - name: Check release doesn't already exist
+      - name: Delete existing release if present
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           RELEASE_TAG="${{ needs.create-tag.outputs.release_tag }}"
           if gh release view "${RELEASE_TAG}" &>/dev/null; then
-            echo "Release ${RELEASE_TAG} already exists — nothing to do"
-            exit 1
+            echo "Deleting existing release ${RELEASE_TAG}..."
+            gh release delete "${RELEASE_TAG}" --yes
+          else
+            echo "No existing release for ${RELEASE_TAG}"
           fi
-          echo "No existing release for ${RELEASE_TAG} — proceeding with build"
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
