@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 
@@ -13,8 +14,6 @@ export interface PhotoValue {
 interface PhotoPickerFieldProps {
   value: PhotoValue | null;
   onChange: (value: PhotoValue | null) => void;
-  /** If true, hide the picker buttons when a photo is already selected. */
-  hideButtonsWhenSelected?: boolean;
 }
 
 const PICK_OPTIONS: ImagePicker.ImagePickerOptions = {
@@ -24,9 +23,9 @@ const PICK_OPTIONS: ImagePicker.ImagePickerOptions = {
 };
 
 /** Pick from the library or take a photo; stores a local URI + dimensions. */
-export function PhotoPickerField({ value, onChange, hideButtonsWhenSelected }: PhotoPickerFieldProps): React.JSX.Element {
+export function PhotoPickerField({ value, onChange }: PhotoPickerFieldProps): React.JSX.Element {
   const { colors } = useTheme();
-  const showButtons = !hideButtonsWhenSelected || value === null;
+  const [showEditMenu, setShowEditMenu] = useState(false);
 
   async function pickFromLibrary(): Promise<void> {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -51,6 +50,7 @@ export function PhotoPickerField({ value, onChange, hideButtonsWhenSelected }: P
     const asset = result.assets[0];
     if (asset === undefined) return;
     onChange({ uri: asset.uri, width: asset.width ?? null, height: asset.height ?? null });
+    setShowEditMenu(false);
   }
 
   return (
@@ -59,26 +59,36 @@ export function PhotoPickerField({ value, onChange, hideButtonsWhenSelected }: P
         <View style={styles.previewWrap}>
           <Image source={{ uri: value.uri }} style={styles.preview} resizeMode="cover" />
           <Pressable
-            onPress={() => onChange(null)}
-            style={[styles.removeBtn, { backgroundColor: colors.overlay }]}
-            accessibilityLabel="Remove photo"
+            onPress={() => setShowEditMenu(true)}
+            style={[styles.editBtn, { backgroundColor: colors.overlay }]}
+            accessibilityLabel="Edit photo"
             hitSlop={8}
           >
-            <Ionicons name="close" size={18} color={colors.onOverlay} />
+            <Ionicons name="pencil" size={18} color={colors.onOverlay} />
           </Pressable>
         </View>
       ) : (
-        <View style={[styles.placeholder, { backgroundColor: colors.tilePlaceholder }]}>
-          <Ionicons name="image-outline" size={40} color={colors.textMuted} />
-        </View>
+        <>
+          <View style={[styles.placeholder, { backgroundColor: colors.tilePlaceholder }]}>
+            <Ionicons name="image-outline" size={40} color={colors.textMuted} />
+          </View>
+          <View style={styles.actions}>
+            <PickerButton icon="images-outline" label="Library" onPress={() => void pickFromLibrary()} />
+            <PickerButton icon="camera-outline" label="Camera" onPress={() => void takePhoto()} />
+          </View>
+        </>
       )}
 
-      {showButtons && (
-        <View style={styles.actions}>
-          <PickerButton icon="images-outline" label="Library" onPress={() => void pickFromLibrary()} />
-          <PickerButton icon="camera-outline" label="Camera" onPress={() => void takePhoto()} />
-        </View>
-      )}
+      <EditPhotoModal
+        isVisible={showEditMenu}
+        onLibrary={() => void pickFromLibrary()}
+        onCamera={() => void takePhoto()}
+        onRemove={() => {
+          onChange(null);
+          setShowEditMenu(false);
+        }}
+        onCancel={() => setShowEditMenu(false)}
+      />
     </View>
   );
 }
@@ -104,6 +114,53 @@ function PickerButton({
   );
 }
 
+function EditPhotoModal({
+  isVisible,
+  onLibrary,
+  onCamera,
+  onRemove,
+  onCancel,
+}: {
+  isVisible: boolean;
+  onLibrary: () => void;
+  onCamera: () => void;
+  onRemove: () => void;
+  onCancel: () => void;
+}): React.JSX.Element {
+  const { colors } = useTheme();
+  return (
+    <Modal visible={isVisible} transparent animationType="fade">
+      <Pressable style={styles.modalBackdrop} onPress={onCancel} />
+      <View style={[styles.menuContainer, { backgroundColor: colors.surface }]}>
+        <Pressable
+          onPress={onLibrary}
+          style={[styles.menuItem, { borderBottomColor: colors.border }]}
+        >
+          <Ionicons name="images-outline" size={20} color={colors.textPrimary} />
+          <Text style={[styles.menuLabel, { color: colors.textPrimary }]}>Choose from library</Text>
+        </Pressable>
+        <Pressable
+          onPress={onCamera}
+          style={[styles.menuItem, { borderBottomColor: colors.border }]}
+        >
+          <Ionicons name="camera-outline" size={20} color={colors.textPrimary} />
+          <Text style={[styles.menuLabel, { color: colors.textPrimary }]}>Take a photo</Text>
+        </Pressable>
+        <Pressable onPress={onRemove} style={styles.menuItem}>
+          <Ionicons name="trash-outline" size={20} color={colors.danger} />
+          <Text style={[styles.menuLabel, { color: colors.danger }]}>Remove photo</Text>
+        </Pressable>
+        <Pressable
+          onPress={onCancel}
+          style={[styles.menuCancel, { backgroundColor: colors.surfaceAlt }]}
+        >
+          <Text style={[styles.menuCancelLabel, { color: colors.textPrimary }]}>Cancel</Text>
+        </Pressable>
+      </View>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     gap: SPACING.sm,
@@ -116,7 +173,7 @@ const styles = StyleSheet.create({
     height: 220,
     borderRadius: RADIUS.lg,
   },
-  removeBtn: {
+  editBtn: {
     position: 'absolute',
     top: SPACING.sm,
     right: SPACING.sm,
@@ -149,6 +206,45 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  menuContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: RADIUS.lg,
+    borderTopRightRadius: RADIUS.lg,
+    paddingBottom: SPACING.lg,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+  },
+  menuLabel: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '500',
+  },
+  menuCancel: {
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.md,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+  },
+  menuCancelLabel: {
+    fontSize: FONT_SIZE.md,
     fontWeight: '600',
   },
 });
