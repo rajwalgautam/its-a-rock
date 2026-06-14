@@ -22,6 +22,7 @@ export default function Settings(): React.JSX.Element {
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [checking, setChecking] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
+  const [hasChecked, setHasChecked] = useState(false);
 
   const version = Constants.expoConfig?.version ?? '—';
 
@@ -36,6 +37,7 @@ export default function Settings(): React.JSX.Element {
       const result = await performUpdateCheck();
       setLatestVersion(result.isNewer ? result.remoteVersion : null);
       setLastChecked(await getLastCheckedAt());
+      setHasChecked(true);
     } finally {
       setChecking(false);
     }
@@ -86,7 +88,9 @@ export default function Settings(): React.JSX.Element {
                 ? 'Checking…'
                 : latestVersion !== null
                   ? `v${latestVersion} available →`
-                  : 'Check'}
+                  : hasChecked
+                    ? 'Up to date'
+                    : 'Check'}
             </Text>
           </Pressable>
           <Text style={[styles.lastChecked, { color: colors.textMuted }]}>

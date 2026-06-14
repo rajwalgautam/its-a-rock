@@ -32,7 +32,7 @@ export default function TabsLayout(): React.JSX.Element {
         options={{
           title: 'My Climbing',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'barbell' : 'barbell-outline'} size={24} color={color} />
+            <Ionicons name={focused ? 'hand-right' : 'hand-right-outline'} size={24} color={color} />
           ),
         }}
       />

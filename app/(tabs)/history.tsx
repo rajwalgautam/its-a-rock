@@ -27,7 +27,7 @@ export default function History(): React.JSX.Element {
 
   const header = (
     <View style={styles.header}>
-      <Text style={[styles.title, { color: colors.textPrimary }]}>All climbs</Text>
+      <Text style={[styles.title, { color: colors.textPrimary }]}>All Climbs</Text>
       <ColumnDensityControl />
     </View>
   );
