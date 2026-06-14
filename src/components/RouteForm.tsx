@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import {
-  DatePickerIOS,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -135,7 +135,7 @@ export function RouteForm({
         <GradePicker value={state.grade} onChange={(grade) => patch({ grade })} />
       </Field>
 
-      <Field>
+      <Field label="">
         <Pressable
           onPress={() => toggleCompleted(!state.completed)}
           style={styles.checkboxRow}
@@ -282,25 +282,41 @@ function DatePickerModal({
   const { colors } = useTheme();
   const [tempDate, setTempDate] = useState(new Date(value ?? Date.now()));
 
+  function changeDay(delta: number): void {
+    const newDate = new Date(tempDate);
+    newDate.setDate(newDate.getDate() + delta);
+    if (newDate <= new Date()) {
+      setTempDate(newDate);
+    }
+  }
+
   return (
-    <Modal visible={isVisible} transparent animationType="slide">
-      <View style={[styles.pickerOverlay, { backgroundColor: colors.overlay }]}>
-        <View style={[styles.pickerContainer, { backgroundColor: colors.surface }]}>
-          <View style={[styles.pickerHeader, { borderBottomColor: colors.border }]}>
-            <Pressable onPress={onCancel} hitSlop={8}>
-              <Text style={[styles.pickerAction, { color: colors.primary }]}>Cancel</Text>
-            </Pressable>
-            <Pressable onPress={() => onConfirm(tempDate.getTime())} hitSlop={8}>
-              <Text style={[styles.pickerAction, { color: colors.primary, fontWeight: '700' }]}>Done</Text>
-            </Pressable>
-          </View>
-          <DatePickerIOS
-            date={tempDate}
-            onDateChange={setTempDate}
-            mode="date"
-            maximumDate={new Date()}
-          />
+    <Modal visible={isVisible} transparent animationType="fade">
+      <Pressable style={styles.modalBackdrop} onPress={onCancel} />
+      <View style={[styles.pickerContainer, { backgroundColor: colors.surface }]}>
+        <View style={[styles.pickerHeader, { borderBottomColor: colors.border }]}>
+          <Pressable onPress={onCancel} hitSlop={8}>
+            <Text style={[styles.pickerAction, { color: colors.primary }]}>Cancel</Text>
+          </Pressable>
+          <Text style={[styles.pickerTitle, { color: colors.textPrimary }]}>Select date</Text>
+          <Pressable onPress={() => onConfirm(tempDate.getTime())} hitSlop={8}>
+            <Text style={[styles.pickerAction, { color: colors.primary, fontWeight: '700' }]}>Done</Text>
+          </Pressable>
         </View>
+        <View style={styles.dateControlsRow}>
+          <Pressable onPress={() => changeDay(-1)} style={[styles.dateBtn, { backgroundColor: colors.surfaceAlt }]}>
+            <Ionicons name="chevron-back" size={24} color={colors.textSecondary} />
+          </Pressable>
+          <Text style={[styles.selectedDate, { color: colors.textPrimary }]}>
+            {formatDate(tempDate.getTime())}
+          </Text>
+          <Pressable onPress={() => changeDay(1)} style={[styles.dateBtn, { backgroundColor: colors.surfaceAlt }]}>
+            <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
+          </Pressable>
+        </View>
+        <Pressable onPress={() => setTempDate(new Date())} style={[styles.todayBtn, { backgroundColor: colors.primary }]}>
+          <Text style={[styles.todayBtnText, { color: colors.onPrimary }]}>Today</Text>
+        </Pressable>
       </View>
     </Modal>
   );
@@ -378,11 +394,18 @@ const styles = StyleSheet.create({
   dateButtonValue: {
     fontSize: FONT_SIZE.md,
   },
-  pickerOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   pickerContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     borderTopLeftRadius: RADIUS.lg,
     borderTopRightRadius: RADIUS.lg,
     paddingBottom: SPACING.lg,
@@ -395,8 +418,42 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     borderBottomWidth: 1,
   },
+  pickerTitle: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+  },
   pickerAction: {
     fontSize: FONT_SIZE.md,
+  },
+  dateControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.md,
+    paddingVertical: SPACING.lg,
+  },
+  dateBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedDate: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '600',
+    minWidth: 120,
+    textAlign: 'center',
+  },
+  todayBtn: {
+    marginHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+  },
+  todayBtnText: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
   },
   actions: {
     flexDirection: 'row',
