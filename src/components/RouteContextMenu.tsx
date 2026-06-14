@@ -151,7 +151,7 @@ function MenuItem({ label, icon, onPress, colors, isDangerous }: MenuItemProps):
       <Ionicons
         name={icon as any}
         size={16}
-        color={isDangerous ? colors.danger : '#000000'}
+        color={isDangerous ? colors.danger : colors.textPrimary}
         style={styles.menuIcon}
       />
     </Pressable>
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   menuLabel: {
-    fontSize: FONT_SIZE.md,
+    fontSize: FONT_SIZE.lg,
     fontWeight: '500',
     flex: 1,
   },
