@@ -17,7 +17,7 @@
     "expo-file-system": "~55.0.14",
     "expo-haptics": "^55.0.14",
     "expo-image-picker": "~55.0.14",
-    "expo-intent-launcher": "^56.0.4",
+    "expo-intent-launcher": "~55.0.4",
     "expo-linking": "~55.0.15",
     "expo-router": "~55.0.14",
     "expo-sqlite": "^55.0.15",
