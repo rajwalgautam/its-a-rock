@@ -14,7 +14,7 @@ export function useRouteActions(): (route: RouteWithGym) => void {
 
   return useCallback(
     (route: RouteWithGym) => {
-      const toggleLabel = route.completed ? 'Mark as project' : 'Mark as sent';
+      const toggleLabel = route.completed ? 'Mark as incomplete' : 'Mark as completed';
       Alert.alert(route.gym.name, route.grade ?? 'Ungraded', [
         {
           text: toggleLabel,

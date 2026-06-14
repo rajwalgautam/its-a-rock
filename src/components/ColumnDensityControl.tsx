@@ -4,44 +4,61 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import type { ColumnDensity } from '@/types';
 
-const DENSITIES: ColumnDensity[] = [2, 3, 4];
+const DENSITIES: Array<{ density: ColumnDensity; label: string }> = [
+  { density: 2, label: 'Large' },
+  { density: 3, label: 'Medium' },
+  { density: 4, label: 'Small' },
+];
 
-/** Segmented 2/3/4 control bound to the app-wide column density setting. */
+/** Segmented column density control with label. */
 export function ColumnDensityControl(): React.JSX.Element {
   const { colors } = useTheme();
   const density = useSettingsStore((s) => s.columnDensity);
   const setDensity = useSettingsStore((s) => s.setColumnDensity);
 
   return (
-    <View style={[styles.group, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
-      {DENSITIES.map((d) => {
-        const active = d === density;
-        return (
-          <Pressable
-            key={d}
-            onPress={() => setDensity(d)}
-            accessibilityRole="button"
-            accessibilityLabel={`${d} columns`}
-            accessibilityState={{ selected: active }}
-            style={[styles.segment, active && { backgroundColor: colors.surface }]}
-          >
-            <Text
-              style={{
-                color: active ? colors.primary : colors.textMuted,
-                fontSize: FONT_SIZE.sm,
-                fontWeight: '700',
-              }}
+    <View style={styles.container}>
+      <Text style={[styles.label, { color: colors.textMuted }]}>Columns</Text>
+      <View style={[styles.group, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
+        {DENSITIES.map(({ density: d, label }) => {
+          const active = d === density;
+          return (
+            <Pressable
+              key={d}
+              onPress={() => setDensity(d)}
+              accessibilityRole="button"
+              accessibilityLabel={`${label} (${d} columns)`}
+              accessibilityState={{ selected: active }}
+              style={[styles.segment, active && { backgroundColor: colors.surface }]}
             >
-              {d}
-            </Text>
-          </Pressable>
-        );
-      })}
+              <Text
+                style={{
+                  color: active ? colors.primary : colors.textMuted,
+                  fontSize: FONT_SIZE.sm,
+                  fontWeight: '700',
+                }}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    alignItems: 'flex-end',
+    gap: SPACING.xs,
+  },
+  label: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   group: {
     flexDirection: 'row',
     borderRadius: RADIUS.md,
@@ -50,8 +67,9 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   segment: {
-    width: 34,
-    height: 30,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    minWidth: 50,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: RADIUS.sm,
