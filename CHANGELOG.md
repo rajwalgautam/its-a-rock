@@ -2,6 +2,25 @@
 
 All notable changes to It's A Rock are documented in this file.
 
+## [v0.4.2] - 2026-06-13
+
+### Fixed
+
+- **Location field auto-refill** — Location field no longer re-populates when clearing it with backspace, allowing smooth entry of new gym locations
+- **Photo permissions** — Removed invasive media library write permission; camera now only requires camera permission
+
+### Changed
+
+- **Status indicators** — Active climbs now show with green dots, completed climbs with orange dots, providing clearer visual hierarchy
+
+### Technical
+
+- Enhanced `LocationPickerField` with ref-based initialization to prevent unwanted auto-population
+- Updated photo handling to store cache files without media library dependency
+- Removed `expo-media-library` imports from photo picker components
+
+---
+
 ## [v0.4.1] - 2026-06-13
 
 ### Fixed

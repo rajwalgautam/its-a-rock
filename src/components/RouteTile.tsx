@@ -22,7 +22,7 @@ export function RouteTile({ route, size, onPress, onLongPress }: RouteTileProps)
   const tileRef = useRef<View>(null);
 
   const getStatusColor = (): string => {
-    if (route.completed) return colors.success; // Green for completed
+    if (route.completed) return colors.primary; // Orange for completed
 
     if (route.startedAt !== null) {
       const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
@@ -32,7 +32,7 @@ export function RouteTile({ route, size, onPress, onLongPress }: RouteTileProps)
       }
     }
 
-    return colors.primary; // Orange for active
+    return colors.success; // Green for active
   };
 
   const displayDate = route.startedAt ?? route.completedAt;
