@@ -62,7 +62,13 @@ export default function MyClimbing(): React.JSX.Element {
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
       />
-      <FloatingAddButton onPress={() => router.push('/routes/new')} />
+      <FloatingAddButton onPress={(photoUri) => {
+        if (photoUri) {
+          router.push({ pathname: '/routes/new', params: { photoUri } });
+        } else {
+          router.push('/routes/new');
+        }
+      }} />
     </SafeAreaView>
   );
 }
