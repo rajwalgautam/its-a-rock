@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import { Alert, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { FONT_SIZE, RADIUS, SHADOW, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -35,16 +36,31 @@ export function FloatingAddButton({ onPress, style }: FloatingAddButtonProps): R
   }
 
   async function takePhoto(): Promise<void> {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
+    const cameraPerm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!cameraPerm.granted) {
       Alert.alert('Permission needed', 'Allow camera access to take a climb photo.');
       return;
     }
+
     const result = await ImagePicker.launchCameraAsync(PICK_OPTIONS);
     if (result.canceled) return;
+
     const asset = result.assets[0];
     if (asset === undefined) return;
-    onPress(asset.uri);
+
+    const libraryPerm = await MediaLibrary.requestPermissionsAsync();
+    if (!libraryPerm.granted) {
+      Alert.alert('Permission needed', 'Allow access to save photos to your library.');
+      return;
+    }
+
+    try {
+      const savedAsset = await MediaLibrary.createAssetAsync(asset.uri);
+      onPress(savedAsset.uri);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save photo to library.');
+      console.error('Failed to save photo:', error);
+    }
   }
 
   function showMenu(): void {

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,11 +6,11 @@ import { router, useFocusEffect } from 'expo-router';
 import { FONT_SIZE, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useRouteStore } from '@/store/useRouteStore';
-import { useRouteActions } from '@/hooks/useRouteActions';
 import { RouteGrid } from '@/components/RouteGrid';
 import { StatCard } from '@/components/StatCard';
 import { FloatingAddButton } from '@/components/FloatingAddButton';
 import { UpdateBanner } from '@/components/UpdateBanner';
+import { RouteContextMenu } from '@/components/RouteContextMenu';
 import type { RouteWithGym } from '@/types';
 
 export default function MyClimbing(): React.JSX.Element {
@@ -19,7 +19,9 @@ export default function MyClimbing(): React.JSX.Element {
   const stats = useRouteStore((s) => s.weeklyStats);
   const loadProjects = useRouteStore((s) => s.loadProjects);
   const loadWeeklyStats = useRouteStore((s) => s.loadWeeklyStats);
-  const onLongPress = useRouteActions();
+  const [selectedRoute, setSelectedRoute] = useState<RouteWithGym | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | undefined>();
+  const [menuVisible, setMenuVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -29,6 +31,12 @@ export default function MyClimbing(): React.JSX.Element {
   );
 
   const openRoute = (route: RouteWithGym): void => router.push(`/routes/${route.id}`);
+
+  const handleTileLongPress = useCallback((route: RouteWithGym, x: number, y: number): void => {
+    setSelectedRoute(route);
+    setMenuPosition({ x, y });
+    setMenuVisible(true);
+  }, []);
 
   const header = (
     <View style={styles.header}>
@@ -58,11 +66,24 @@ export default function MyClimbing(): React.JSX.Element {
       <RouteGrid
         routes={projects}
         onTilePress={openRoute}
-        onTileLongPress={onLongPress}
+        onTileLongPress={handleTileLongPress}
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
       />
-      <FloatingAddButton onPress={() => router.push('/routes/new')} />
+      <FloatingAddButton onPress={(photoUri) => {
+        if (photoUri) {
+          router.push({ pathname: '/routes/new', params: { photoUri } });
+        } else {
+          router.push('/routes/new');
+        }
+      }} />
+      <RouteContextMenu
+        visible={menuVisible}
+        route={selectedRoute}
+        position={menuPosition}
+        onDismiss={() => setMenuVisible(false)}
+        onEdit={(route) => router.push(`/routes/${route.id}`)}
+      />
     </SafeAreaView>
   );
 }

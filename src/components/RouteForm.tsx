@@ -21,6 +21,8 @@ import type { RouteInput, RouteWithGym } from '@/types';
 interface RouteFormProps {
   /** Existing route to edit; omit for a new climb. */
   initial?: RouteWithGym;
+  /** Pre-selected photo URI for a new climb (from FAB). */
+  initialPhotoUri?: string;
   submitLabel: string;
   onSubmit: (input: RouteInput) => Promise<void> | void;
   onCancel?: () => void;
@@ -37,14 +39,16 @@ interface FormState {
   completedAt: number | null;
 }
 
-function toState(initial?: RouteWithGym): FormState {
+function toState(initial?: RouteWithGym, initialPhotoUri?: string): FormState {
   return {
     name: initial?.name ?? '',
     gymName: initial?.gym.name ?? '',
     photo:
       initial?.photoUri != null
         ? { uri: initial.photoUri, width: initial.photoWidth, height: initial.photoHeight }
-        : null,
+        : initialPhotoUri
+          ? { uri: initialPhotoUri, width: null, height: null }
+          : null,
     grade: initial?.grade ?? null,
     completed: initial?.completed ?? false,
     notes: initial?.notes ?? '',
@@ -73,12 +77,13 @@ function toInput(s: FormState): RouteInput {
 /** Shared add/edit field set. Validates on submit; both screens reuse this. */
 export function RouteForm({
   initial,
+  initialPhotoUri,
   submitLabel,
   onSubmit,
   onCancel,
 }: RouteFormProps): React.JSX.Element {
   const { colors } = useTheme();
-  const [state, setState] = useState<FormState>(() => toState(initial));
+  const [state, setState] = useState<FormState>(() => toState(initial, initialPhotoUri));
   const [errors, setErrors] = useState<ReturnType<typeof validateRouteInput>['errors']>({});
   const [saving, setSaving] = useState(false);
   const [datePickerField, setDatePickerField] = useState<'started' | 'completed' | null>(null);

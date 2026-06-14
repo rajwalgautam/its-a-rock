@@ -2,6 +2,28 @@
 
 All notable changes to It's A Rock are documented in this file.
 
+## [v0.4.1] - 2026-06-13
+
+### Fixed
+
+- **Photo picker modal dismiss** — Modal now properly closes when tapping outside the menu area, improving the interaction flow
+- **Photos from FAB in form** — Photo taken via the floating action button now displays as a preview in the climb form with a change option, instead of showing empty camera/library buttons
+- **Date picker display** — Date picker now shows "Today" when selecting the current date, removing confusion when browsing past climbs
+- **Camera photo persistence** — Photos taken with the camera are now automatically saved to the device's media library
+
+### Changed
+
+- **Photo edit interface** — Photo editing menu now uses a bottom sheet modal instead of inline buttons, providing better UX and consistent behavior
+
+### Technical
+
+- Enhanced `PhotoPickerField` with modal-based edit menu and `pointerEvents="box-none"` for proper touch handling
+- Integrated `expo-media-library` for automatic photo library saving
+- Updated `FloatingAddButton` to pass photo URIs to the climb form
+- Added `initialPhotoUri` parameter to `RouteForm` for seamless photo integration
+
+---
+
 ## [v0.4.0] - 2026-06-13
 
 ### Added

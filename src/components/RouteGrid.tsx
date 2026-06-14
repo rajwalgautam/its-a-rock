@@ -8,7 +8,7 @@ import type { RouteWithGym } from '@/types';
 interface RouteGridProps {
   routes: RouteWithGym[];
   onTilePress: (route: RouteWithGym) => void;
-  onTileLongPress: (route: RouteWithGym) => void;
+  onTileLongPress: (route: RouteWithGym, x: number, y: number) => void;
   /** Rendered above the grid and scrolled with it (stats row, controls, …). */
   ListHeaderComponent?: ReactElement;
   /** Rendered when there are no routes. */

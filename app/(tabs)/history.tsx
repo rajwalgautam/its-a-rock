@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,8 +6,8 @@ import { router, useFocusEffect } from 'expo-router';
 import { FONT_SIZE, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useRouteStore } from '@/store/useRouteStore';
-import { useRouteActions } from '@/hooks/useRouteActions';
 import { RouteGrid } from '@/components/RouteGrid';
+import { RouteContextMenu } from '@/components/RouteContextMenu';
 import { ColumnDensityControl } from '@/components/ColumnDensityControl';
 import type { RouteWithGym } from '@/types';
 
@@ -15,7 +15,9 @@ export default function History(): React.JSX.Element {
   const { colors } = useTheme();
   const routes = useRouteStore((s) => s.routes);
   const loadRoutes = useRouteStore((s) => s.loadRoutes);
-  const onLongPress = useRouteActions();
+  const [selectedRoute, setSelectedRoute] = useState<RouteWithGym | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | undefined>();
+  const [menuVisible, setMenuVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -24,6 +26,12 @@ export default function History(): React.JSX.Element {
   );
 
   const openRoute = (route: RouteWithGym): void => router.push(`/routes/${route.id}`);
+
+  const handleTileLongPress = useCallback((route: RouteWithGym, x: number, y: number): void => {
+    setSelectedRoute(route);
+    setMenuPosition({ x, y });
+    setMenuVisible(true);
+  }, []);
 
   const header = (
     <View style={styles.header}>
@@ -47,9 +55,16 @@ export default function History(): React.JSX.Element {
       <RouteGrid
         routes={routes}
         onTilePress={openRoute}
-        onTileLongPress={onLongPress}
+        onTileLongPress={handleTileLongPress}
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
+      />
+      <RouteContextMenu
+        visible={menuVisible}
+        route={selectedRoute}
+        position={menuPosition}
+        onDismiss={() => setMenuVisible(false)}
+        onEdit={(route) => router.push(`/routes/${route.id}`)}
       />
     </SafeAreaView>
   );

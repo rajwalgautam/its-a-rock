@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
@@ -10,7 +11,7 @@ interface RouteTileProps {
   /** Side length in px (tiles are square). */
   size: number;
   onPress: (route: RouteWithGym) => void;
-  onLongPress: (route: RouteWithGym) => void;
+  onLongPress: (route: RouteWithGym, x: number, y: number) => void;
 }
 
 /** A single grid tile: the climb photo with grade + location overlaid. */
@@ -18,18 +19,37 @@ export function RouteTile({ route, size, onPress, onLongPress }: RouteTileProps)
   const { colors } = useTheme();
   const hasPhoto = route.photoUri !== null && route.photoUri.length > 0;
   const smallFont = size < 130;
+  const tileRef = useRef<View>(null);
 
   const getStatusColor = (): string => {
-    if (route.completed) return colors.success; // Orange/success for completed
-    return colors.textMuted; // Yellow-ish for incomplete (using muted, can be overridden)
+    if (route.completed) return colors.success; // Green for completed
+
+    if (route.startedAt !== null) {
+      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+      const daysSinceStart = Date.now() - route.startedAt;
+      if (daysSinceStart > thirtyDaysMs) {
+        return colors.warning; // Yellow for incomplete (>30 days)
+      }
+    }
+
+    return colors.primary; // Orange for active
   };
 
   const displayDate = route.startedAt ?? route.completedAt;
 
+  const handleLongPress = (): void => {
+    if (tileRef.current) {
+      tileRef.current.measure((_x, _y, width, _height, pageX, pageY) => {
+        onLongPress(route, pageX + width / 2, pageY);
+      });
+    }
+  };
+
   return (
     <Pressable
+      ref={tileRef}
       onPress={() => onPress(route)}
-      onLongPress={() => onLongPress(route)}
+      onLongPress={handleLongPress}
       accessibilityRole="button"
       accessibilityLabel={`${formatGradeLabel(route.grade)} at ${route.gym.name}`}
       style={({ pressed }) => [
