@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { FONT_SIZE, RADIUS, SHADOW, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import {
+  downloadAndInstallApk,
   formatLastChecked,
   getLastCheckedAt,
   performUpdateCheck,
+  releaseTagUrl,
 } from '@/utils/updateChecker';
 import type { ThemeMode } from '@/types';
 
@@ -23,6 +25,7 @@ export default function Settings(): React.JSX.Element {
   const [checking, setChecking] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [hasChecked, setHasChecked] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const version = Constants.expoConfig?.version ?? '—';
 
@@ -40,6 +43,19 @@ export default function Settings(): React.JSX.Element {
       setHasChecked(true);
     } finally {
       setChecking(false);
+    }
+  }
+
+  async function downloadUpdate(): Promise<void> {
+    if (downloading || latestVersion === null) return;
+    setDownloading(true);
+    try {
+      await downloadAndInstallApk(latestVersion);
+    } catch {
+      Alert.alert('Download failed', 'Opening the release page in your browser instead.');
+      void Linking.openURL(releaseTagUrl(latestVersion));
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -81,16 +97,22 @@ export default function Settings(): React.JSX.Element {
             <Text style={[styles.rowValue, { color: colors.textSecondary }]}>v{version}</Text>
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <Pressable style={styles.row} onPress={() => void checkForUpdates()} disabled={checking}>
+          <Pressable
+            style={styles.row}
+            onPress={() => void (latestVersion !== null ? downloadUpdate() : checkForUpdates())}
+            disabled={checking || downloading}
+          >
             <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Check for Updates</Text>
             <Text style={[styles.rowValue, { color: colors.primary }]}>
               {checking
                 ? 'Checking…'
-                : latestVersion !== null
-                  ? `v${latestVersion} available →`
-                  : hasChecked
-                    ? 'Up to date'
-                    : 'Check'}
+                : downloading
+                  ? 'Downloading…'
+                  : latestVersion !== null
+                    ? `v${latestVersion} available →`
+                    : hasChecked
+                      ? 'Up to date'
+                      : 'Check'}
             </Text>
           </Pressable>
           <Text style={[styles.lastChecked, { color: colors.textMuted }]}>
