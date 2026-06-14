@@ -268,6 +268,15 @@ function DatePickerButton({
   );
 }
 
+function isToday(date: Date): boolean {
+  const today = new Date();
+  return (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  );
+}
+
 function DatePickerModal({
   isVisible,
   value,
@@ -308,7 +317,7 @@ function DatePickerModal({
             <Ionicons name="chevron-back" size={24} color={colors.textSecondary} />
           </Pressable>
           <Text style={[styles.selectedDate, { color: colors.textPrimary }]}>
-            {formatDate(tempDate.getTime())}
+            {isToday(tempDate) ? 'Today' : formatDate(tempDate.getTime())}
           </Text>
           <Pressable onPress={() => changeDay(1)} style={[styles.dateBtn, { backgroundColor: colors.surfaceAlt }]}>
             <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
