@@ -19,7 +19,9 @@ interface PhotoPickerFieldProps {
 const PICK_OPTIONS: ImagePicker.ImagePickerOptions = {
   mediaTypes: ['images'],
   quality: 0.8,
-  allowsEditing: false,
+  // Surfaces the OS crop/zoom UI right after picking or shooting, so users can
+  // frame the boulder problem and trim distracting background.
+  allowsEditing: true,
 };
 
 /** Pick from the library or take a photo; stores a local URI + dimensions. */

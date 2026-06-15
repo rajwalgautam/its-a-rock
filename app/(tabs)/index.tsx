@@ -10,7 +10,7 @@ import { RouteGrid } from '@/components/RouteGrid';
 import { StatCard } from '@/components/StatCard';
 import { FloatingAddButton } from '@/components/FloatingAddButton';
 import { UpdateBanner } from '@/components/UpdateBanner';
-import { RouteContextMenu } from '@/components/RouteContextMenu';
+import { RouteContextMenu, type MenuAnchor } from '@/components/RouteContextMenu';
 import type { RouteWithGym } from '@/types';
 
 export default function MyClimbing(): React.JSX.Element {
@@ -20,7 +20,7 @@ export default function MyClimbing(): React.JSX.Element {
   const loadProjects = useRouteStore((s) => s.loadProjects);
   const loadWeeklyStats = useRouteStore((s) => s.loadWeeklyStats);
   const [selectedRoute, setSelectedRoute] = useState<RouteWithGym | null>(null);
-  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | undefined>();
+  const [menuAnchor, setMenuAnchor] = useState<MenuAnchor | undefined>();
   const [menuVisible, setMenuVisible] = useState(false);
 
   useFocusEffect(
@@ -32,9 +32,9 @@ export default function MyClimbing(): React.JSX.Element {
 
   const openRoute = (route: RouteWithGym): void => router.push(`/routes/${route.id}`);
 
-  const handleTileLongPress = useCallback((route: RouteWithGym, x: number, y: number): void => {
+  const handleTileLongPress = useCallback((route: RouteWithGym, anchor: MenuAnchor): void => {
     setSelectedRoute(route);
-    setMenuPosition({ x, y });
+    setMenuAnchor(anchor);
     setMenuVisible(true);
   }, []);
 
@@ -80,7 +80,7 @@ export default function MyClimbing(): React.JSX.Element {
       <RouteContextMenu
         visible={menuVisible}
         route={selectedRoute}
-        position={menuPosition}
+        anchor={menuAnchor}
         onDismiss={() => setMenuVisible(false)}
         onEdit={(route) => router.push(`/routes/${route.id}`)}
       />

@@ -7,10 +7,17 @@ import { useRouteStore } from '@/store/useRouteStore';
 import { routeToInput } from '@/utils/routeInput';
 import type { RouteWithGym } from '@/types';
 
+/** Long-press anchor: horizontal center plus the tile's top/bottom edges. */
+export interface MenuAnchor {
+  x: number;
+  top: number;
+  bottom: number;
+}
+
 interface RouteContextMenuProps {
   visible: boolean;
   route: RouteWithGym | null;
-  position?: { x: number; y: number };
+  anchor?: MenuAnchor;
   onDismiss: () => void;
   onEdit?: (route: RouteWithGym) => void;
 }
@@ -18,7 +25,7 @@ interface RouteContextMenuProps {
 const MENU_HEIGHT = 140; // approximate height of menu with 3 items + dividers
 const MENU_WIDTH = 200;
 
-export function RouteContextMenu({ visible, route, position, onDismiss, onEdit }: RouteContextMenuProps): React.JSX.Element {
+export function RouteContextMenu({ visible, route, anchor, onDismiss, onEdit }: RouteContextMenuProps): React.JSX.Element {
   const { colors } = useTheme();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const editRoute = useRouteStore((s) => s.editRoute);
@@ -57,14 +64,16 @@ export function RouteContextMenu({ visible, route, position, onDismiss, onEdit }
     onDismiss();
   }, [route, onEdit, onDismiss]);
 
-  if (!visible || !route || !position) return <></>;
+  if (!visible || !route || !anchor) return <></>;
 
   const markCompletedLabel = route.completed ? 'Mark Incomplete' : 'Mark Completed';
 
-  // Determine if menu should appear above or below the tile
-  const showAbove = position.y > screenHeight / 2;
-  const menuTop = showAbove ? position.y - MENU_HEIGHT - SPACING.sm : position.y + SPACING.sm;
-  const menuLeft = Math.max(SPACING.md, Math.min(position.x - MENU_WIDTH / 2, screenWidth - MENU_WIDTH - SPACING.md));
+  // Prefer appearing below the tile; flip above only when there isn't room.
+  const fitsBelow = anchor.bottom + SPACING.sm + MENU_HEIGHT <= screenHeight - SPACING.md;
+  const menuTop = fitsBelow
+    ? anchor.bottom + SPACING.sm
+    : anchor.top - MENU_HEIGHT - SPACING.sm;
+  const menuLeft = Math.max(SPACING.md, Math.min(anchor.x - MENU_WIDTH / 2, screenWidth - MENU_WIDTH - SPACING.md));
 
   if (showDeleteConfirm) {
     return (

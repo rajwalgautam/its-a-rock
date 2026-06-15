@@ -15,7 +15,8 @@ interface FloatingAddButtonProps {
 const PICK_OPTIONS: ImagePicker.ImagePickerOptions = {
   mediaTypes: ['images'],
   quality: 0.8,
-  allowsEditing: false,
+  // Surfaces the OS crop/zoom UI right after picking or shooting.
+  allowsEditing: true,
 };
 
 const MENU_WIDTH = 200;

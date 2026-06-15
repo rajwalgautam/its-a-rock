@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { RouteForm } from '@/components/RouteForm';
+import { PhotoViewer } from '@/components/PhotoViewer';
 import { useRouteStore } from '@/store/useRouteStore';
 import { formatDate, formatGradeLabel, statusLabel } from '@/utils/formatters';
 import type { RouteInput, RouteWithGym } from '@/types';
@@ -20,6 +21,7 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
   const editRoute = useRouteStore((s) => s.editRoute);
   const [editing, setEditing] = useState(false);
   const [current, setCurrent] = useState(route);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   async function handleSave(input: RouteInput): Promise<void> {
     const updated = await editRoute(current.id, input);
@@ -46,7 +48,20 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
   return (
     <View style={styles.container}>
       {hasPhoto && (
-        <Image source={{ uri: current.photoUri! }} style={styles.photo} resizeMode="cover" />
+        <>
+          <Pressable
+            onPress={() => setViewerOpen(true)}
+            accessibilityRole="imagebutton"
+            accessibilityLabel="View photo full screen"
+          >
+            <Image source={{ uri: current.photoUri! }} style={styles.photo} resizeMode="cover" />
+          </Pressable>
+          <PhotoViewer
+            uri={current.photoUri}
+            visible={viewerOpen}
+            onClose={() => setViewerOpen(false)}
+          />
+        </>
       )}
 
       <View style={styles.headerRow}>

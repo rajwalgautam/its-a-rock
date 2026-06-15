@@ -29,6 +29,13 @@ describe('validateRouteInput', () => {
     expect(validateRouteInput(input({ grade: '5.11a' })).valid).toBe(false);
   });
 
+  it('accepts a valid grade range and rejects a reversed one', () => {
+    expect(validateRouteInput(input({ grade: 'V0-V2' })).valid).toBe(true);
+    const reversed = validateRouteInput(input({ grade: 'V5-V2' }));
+    expect(reversed.valid).toBe(false);
+    expect(reversed.errors.grade).toMatch(/start must be at or below/i);
+  });
+
   it('rejects a start date after the send date', () => {
     const result = validateRouteInput(input({ startedAt: 2000, completedAt: 1000 }));
     expect(result.valid).toBe(false);
