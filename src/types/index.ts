@@ -68,6 +68,28 @@ export interface RouteFilters {
   gymId?: number;
 }
 
+// ---- History tab filtering & sorting ----
+
+export type HistoryCompletion = 'all' | 'completed' | 'projects';
+
+export type HistorySort =
+  | 'date-desc'
+  | 'date-asc'
+  | 'grade-desc'
+  | 'grade-asc'
+  | 'gym-asc';
+
+export interface HistoryFilters {
+  completion: HistoryCompletion;
+  /** Restrict to one gym, or null for all. */
+  gymId: number | null;
+  /** Lowest V-scale base to include (serialized grade), or null for no floor. */
+  gradeMin: string | null;
+  /** Highest V-scale base to include (serialized grade), or null for no ceiling. */
+  gradeMax: string | null;
+  sort: HistorySort;
+}
+
 export interface WeeklyStats {
   /** Local midnight of the week's Monday. */
   weekStart: number;

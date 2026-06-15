@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { FONT_SIZE, RADIUS, SHADOW, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
+import { LocationsManager } from '@/components/LocationsManager';
 import {
   downloadAndInstallApk,
   formatLastChecked,
@@ -89,6 +90,9 @@ export default function Settings(): React.JSX.Element {
             })}
           </View>
         </View>
+
+        <SectionLabel label="Locations" />
+        <LocationsManager />
 
         <SectionLabel label="About" />
         <View style={[styles.card, { backgroundColor: colors.surface }, SHADOW.sm]}>

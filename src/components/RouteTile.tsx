@@ -4,6 +4,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { formatGradeLabel, formatShortDate } from '@/utils/formatters';
+import type { MenuAnchor } from '@/components/RouteContextMenu';
 import type { RouteWithGym } from '@/types';
 
 interface RouteTileProps {
@@ -11,7 +12,7 @@ interface RouteTileProps {
   /** Side length in px (tiles are square). */
   size: number;
   onPress: (route: RouteWithGym) => void;
-  onLongPress: (route: RouteWithGym, x: number, y: number) => void;
+  onLongPress: (route: RouteWithGym, anchor: MenuAnchor) => void;
 }
 
 /** A single grid tile: the climb photo with grade + location overlaid. */
@@ -39,8 +40,8 @@ export function RouteTile({ route, size, onPress, onLongPress }: RouteTileProps)
 
   const handleLongPress = (): void => {
     if (tileRef.current) {
-      tileRef.current.measure((_x, _y, width, _height, pageX, pageY) => {
-        onLongPress(route, pageX + width / 2, pageY);
+      tileRef.current.measure((_x, _y, width, height, pageX, pageY) => {
+        onLongPress(route, { x: pageX + width / 2, top: pageY, bottom: pageY + height });
       });
     }
   };

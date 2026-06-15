@@ -1,4 +1,4 @@
-import { parseGrade } from '@/utils/gradeUtils';
+import { isValidGradeOrRange, parseGradeRange } from '@/utils/gradeUtils';
 import type { RouteInput } from '@/types';
 
 export type RouteInputField = 'gymName' | 'grade' | 'dates';
@@ -24,9 +24,12 @@ export function validateRouteInput(input: RouteInput): ValidationResult {
     input.grade !== null &&
     input.grade !== undefined &&
     input.grade.trim().length > 0 &&
-    parseGrade(input.grade) === null
+    !isValidGradeOrRange(input.grade)
   ) {
-    errors.grade = 'Not a valid V-scale grade.';
+    errors.grade =
+      parseGradeRange(input.grade) !== null
+        ? 'Range start must be at or below the end.'
+        : 'Not a valid V-scale grade.';
   }
 
   if (

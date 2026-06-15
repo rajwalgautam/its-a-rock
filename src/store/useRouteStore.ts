@@ -1,13 +1,17 @@
 import { create } from 'zustand';
 import type { Gym, RouteInput, RouteWithGym, WeeklyStats } from '@/types';
 import {
+  countRoutesForGym,
+  createGym,
   createRoute,
+  deleteGym,
   deleteRoute,
   getGyms,
   getProjects,
   getRouteById,
   getRoutes,
   resetAllData,
+  updateGym,
   updateRoute,
 } from '@/db/queries';
 import { computeWeeklyStats } from '@/utils/routeStats';
@@ -27,6 +31,10 @@ interface RouteState {
   addRoute: (input: RouteInput) => Promise<RouteWithGym>;
   editRoute: (id: number, input: RouteInput) => Promise<RouteWithGym>;
   removeRoute: (id: number) => Promise<void>;
+  addGym: (name: string) => Promise<Gym>;
+  editGym: (id: number, name: string) => Promise<Gym>;
+  routeCountForGym: (id: number) => Promise<number>;
+  removeGym: (id: number) => Promise<void>;
   clearAll: () => Promise<void>;
 }
 
@@ -96,6 +104,27 @@ export const useRouteStore = create<RouteState>((set, get) => ({
 
   removeRoute: async (id) => {
     await deleteRoute(id);
+    await refresh(get);
+  },
+
+  addGym: async (name) => {
+    const gym = await createGym(name);
+    await get().loadGyms();
+    return gym;
+  },
+
+  editGym: async (id, name) => {
+    const gym = await updateGym(id, name);
+    await refresh(get);
+    return gym;
+  },
+
+  routeCountForGym: async (id) => {
+    return countRoutesForGym(id);
+  },
+
+  removeGym: async (id) => {
+    await deleteGym(id);
     await refresh(get);
   },
 

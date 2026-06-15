@@ -1,3 +1,5 @@
+import { formatGrade, parseGradeRange } from '@/utils/gradeUtils';
+
 /** Short human date, e.g. "Jun 13, 2026". Returns "" for null/invalid. */
 export function formatDate(ms: number | null | undefined): string {
   if (ms === null || ms === undefined) return '';
@@ -15,11 +17,16 @@ export function statusLabel(completed: boolean): string {
   return completed ? 'Sent' : 'Project';
 }
 
-/** Display string for a possibly-missing grade. */
+/** Display string for a possibly-missing grade. Ranges render as "V0 – V2". */
 export function formatGradeLabel(grade: string | null | undefined): string {
-  return grade !== null && grade !== undefined && grade.trim().length > 0
-    ? grade.trim()
-    : 'Ungraded';
+  if (grade === null || grade === undefined || grade.trim().length === 0) {
+    return 'Ungraded';
+  }
+  const range = parseGradeRange(grade);
+  if (range !== null) {
+    return `${formatGrade(range.min.base, range.min.modifier)} – ${formatGrade(range.max.base, range.max.modifier)}`;
+  }
+  return grade.trim();
 }
 
 /** Short date format: "Jun 13" for current year, "Jun 13 2025" for other years. */

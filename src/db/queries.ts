@@ -209,6 +209,70 @@ export async function getGyms(): Promise<Gym[]> {
   return rows.map(mapGym);
 }
 
+async function getGymByIdOrThrow(id: number): Promise<Gym> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<GymRow>('SELECT * FROM gyms WHERE id = ?', [id]);
+  if (row === null) throw new Error(`Gym ${id} not found after write`);
+  return mapGym(row);
+}
+
+/** Create a new gym, rejecting a name that resolves to an existing one. */
+export async function createGym(name: string): Promise<Gym> {
+  const db = getDatabase();
+  const now = Date.now();
+  const display = formatGymName(name);
+  const normalized = normalizeGymName(name);
+  const existing = await db.getFirstAsync<{ id: number }>(
+    'SELECT id FROM gyms WHERE normalized_name = ?',
+    [normalized],
+  );
+  if (existing !== null) throw new Error('A location with that name already exists.');
+  const result = await db.runAsync(
+    'INSERT INTO gyms (name, normalized_name, created_at, updated_at) VALUES (?, ?, ?, ?)',
+    [display, normalized, now, now],
+  );
+  return getGymByIdOrThrow(result.lastInsertRowId);
+}
+
+/** Rename a gym, rejecting a name that collides with a different gym. */
+export async function updateGym(id: number, name: string): Promise<Gym> {
+  const db = getDatabase();
+  const now = Date.now();
+  const display = formatGymName(name);
+  const normalized = normalizeGymName(name);
+  const dupe = await db.getFirstAsync<{ id: number }>(
+    'SELECT id FROM gyms WHERE normalized_name = ? AND id != ?',
+    [normalized, id],
+  );
+  if (dupe !== null) throw new Error('A location with that name already exists.');
+  await db.runAsync('UPDATE gyms SET name = ?, normalized_name = ?, updated_at = ? WHERE id = ?', [
+    display,
+    normalized,
+    now,
+    id,
+  ]);
+  return getGymByIdOrThrow(id);
+}
+
+/** Number of routes logged at a gym — used to warn before deletion. */
+export async function countRoutesForGym(gymId: number): Promise<number> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{ n: number }>(
+    'SELECT COUNT(*) AS n FROM routes WHERE gym_id = ?',
+    [gymId],
+  );
+  return row?.n ?? 0;
+}
+
+/** Delete a gym and any routes logged at it (cascade), in one transaction. */
+export async function deleteGym(id: number): Promise<void> {
+  const db = getDatabase();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM routes WHERE gym_id = ?', [id]);
+    await db.runAsync('DELETE FROM gyms WHERE id = ?', [id]);
+  });
+}
+
 export async function getRoutesInRange(startMs: number, endMs: number): Promise<RouteWithGym[]> {
   const db = getDatabase();
   const rows = await db.getAllAsync<RouteJoinRow>(

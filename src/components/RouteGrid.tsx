@@ -3,12 +3,13 @@ import { FlatList, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SPACING } from '@/constants/theme';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { RouteTile } from '@/components/RouteTile';
+import type { MenuAnchor } from '@/components/RouteContextMenu';
 import type { RouteWithGym } from '@/types';
 
 interface RouteGridProps {
   routes: RouteWithGym[];
   onTilePress: (route: RouteWithGym) => void;
-  onTileLongPress: (route: RouteWithGym, x: number, y: number) => void;
+  onTileLongPress: (route: RouteWithGym, anchor: MenuAnchor) => void;
   /** Rendered above the grid and scrolled with it (stats row, controls, …). */
   ListHeaderComponent?: ReactElement;
   /** Rendered when there are no routes. */
