@@ -112,6 +112,20 @@ jobs:
             echo "Release version: ${VERSION}"
           fi
 
+      - name: Require matching changelog
+        run: |
+          # Fail fast — before any tag is created — if the version has no
+          # changelog. The filename must match the resolved version including the
+          # leading "v" (e.g. changelogs/v1.0.0.md). For a -rerelease, this is the
+          # base version. Catches typos like "v0.50" (only changelogs/v0.5.0.md exists).
+          VERSION="${{ steps.resolve.outputs.version }}"
+          FILE="changelogs/${VERSION}.md"
+          if [ ! -f "$FILE" ]; then
+            echo "::error::Missing ${FILE}. Create a changelog whose filename matches the release version including the leading 'v' (e.g. changelogs/v1.0.0.md) and commit it to main before releasing."
+            exit 1
+          fi
+          echo "Found changelog ${FILE}"
+
       - name: Create and push tag
         if: steps.resolve.outputs.is_rerelease == 'false'
         run: |
@@ -222,20 +236,17 @@ jobs:
 
       - name: Compose release notes
         run: |
+          # create-tag already guaranteed the v-prefixed changelog exists, so use
+          # it directly (no bare-name or minimal-note fallback).
           VERSION="${{ needs.create-tag.outputs.version }}"
-          BARE="${VERSION#v}"
           REPO="${{ github.repository }}"
-          CHANGELOG=""
-          for f in "changelogs/${VERSION}.md" "changelogs/${BARE}.md"; do
-            [ -f "$f" ] && CHANGELOG="$f" && break
-          done
-          if [ -z "$CHANGELOG" ]; then
-            echo "No changelog found for ${VERSION}; publishing with a minimal note."
-            printf 'Release %s\n' "${VERSION}" > /tmp/release-notes.md
-          else
-            LINK="**Changelog:** [${CHANGELOG}](https://github.com/${REPO}/blob/${VERSION}/${CHANGELOG})"
-            printf '%s\n' "$LINK" > /tmp/release-notes.md
+          CHANGELOG="changelogs/${VERSION}.md"
+          if [ ! -f "$CHANGELOG" ]; then
+            echo "::error::Missing ${CHANGELOG} at the build ref."
+            exit 1
           fi
+          LINK="**Changelog:** [${CHANGELOG}](https://github.com/${REPO}/blob/${VERSION}/${CHANGELOG})"
+          printf '%s\n' "$LINK" > /tmp/release-notes.md
 
       - name: Publish release to its-a-rock
         uses: softprops/action-gh-release@v2

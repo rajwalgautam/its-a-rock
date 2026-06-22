@@ -86,6 +86,13 @@ over an existing install.
 3. Commit the changelog to `main`. Changelog-only and Markdown-only changes don't
    trigger a CI build (`paths-ignore`), so they're cheap to land.
 
+> **The changelog is required.** The release workflow refuses to build a version
+> that has no matching `changelogs/<version>.md` — and the filename must match the
+> dispatched version **including the leading `v`** (e.g. `v1.0.0` →
+> `changelogs/v1.0.0.md`; for a `-rerelease`, the base version's changelog). The
+> check runs **before** the tag is created, so a typo like `v0.50` fails fast and
+> publishes nothing.
+
 ## Cutting the release
 
 1. Go to **Actions → CI / Release → Run workflow** on GitHub.
@@ -143,5 +150,9 @@ offers to download and install the APK.
   new version, or re-release with the `-rerelease` suffix.
 - **"Tag `vX.Y.Z` does not exist — cannot re-release"** — you asked for a
   re-release of a version that was never released. Do a normal release first.
+- **"Missing changelogs/vX.Y.Z.md"** — the dispatched version has no matching
+  changelog. Create `changelogs/vX.Y.Z.md` (filename must match the version,
+  including the leading `v`) and commit it to `main`, then re-run. The workflow
+  fails **before** creating the tag, so nothing was published.
 - **Build failed** — check the workflow run; the `/build-failed` skill can
   diagnose the most recent release run.

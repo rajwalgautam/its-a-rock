@@ -39,5 +39,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: SPACING.lg,
+    paddingBottom: SPACING.xxl,
   },
 });

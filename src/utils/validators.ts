@@ -1,3 +1,4 @@
+import { startOfDayMs } from '@/utils/dateUtils';
 import { isValidGradeOrRange, parseGradeRange } from '@/utils/gradeUtils';
 import type { RouteInput } from '@/types';
 
@@ -37,7 +38,9 @@ export function validateRouteInput(input: RouteInput): ValidationResult {
     input.startedAt !== undefined &&
     input.completedAt !== null &&
     input.completedAt !== undefined &&
-    input.startedAt > input.completedAt
+    // Compare by calendar day: climbs are day-granularity, so the same day
+    // with differing times of day must not be treated as start-after-send.
+    startOfDayMs(input.startedAt) > startOfDayMs(input.completedAt)
   ) {
     errors.dates = 'Start date cannot be after the send date.';
   }
