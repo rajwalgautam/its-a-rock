@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,21 +11,24 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { GradePicker } from '@/components/GradePicker';
-import { PhotoPickerField, type PhotoValue } from '@/components/PhotoPickerField';
+import { MediaGalleryField } from '@/components/MediaGalleryField';
 import { LocationPickerField } from '@/components/LocationPickerField';
 import { formatDate } from '@/utils/formatters';
 import { startOfDayMs } from '@/utils/dateUtils';
 import { validateRouteInput } from '@/utils/validators';
-import type { RouteInput, RouteWithGym } from '@/types';
+import { addMedia } from '@/utils/mediaUtils';
+import { confirmAddVideo, pickVideoFromLibrary } from '@/utils/mediaPicker';
+import type { MediaItem, RouteInput, RouteWithGym } from '@/types';
 
 interface RouteFormProps {
   /** Existing route to edit; omit for a new climb. */
   initial?: RouteWithGym;
-  /** Pre-selected photo URI for a new climb (from FAB). */
-  initialPhotoUri?: string;
+  /** Pre-selected media for a new climb (from the FAB). */
+  initialMedia?: MediaItem[];
   submitLabel: string;
   onSubmit: (input: RouteInput) => Promise<void> | void;
   onCancel?: () => void;
@@ -32,7 +37,7 @@ interface RouteFormProps {
 interface FormState {
   name: string;
   gymName: string;
-  photo: PhotoValue | null;
+  media: MediaItem[];
   grade: string | null;
   completed: boolean;
   notes: string;
@@ -40,16 +45,14 @@ interface FormState {
   completedAt: number | null;
 }
 
-function toState(initial?: RouteWithGym, initialPhotoUri?: string): FormState {
+function toState(initial?: RouteWithGym, initialMedia?: MediaItem[]): FormState {
   return {
     name: initial?.name ?? '',
     gymName: initial?.gym.name ?? '',
-    photo:
-      initial?.photoUri != null
-        ? { uri: initial.photoUri, width: initial.photoWidth, height: initial.photoHeight }
-        : initialPhotoUri
-          ? { uri: initialPhotoUri, width: null, height: null }
-          : null,
+    media:
+      initial !== undefined
+        ? initial.media.map((m) => ({ uri: m.uri, type: m.type, width: m.width, height: m.height }))
+        : (initialMedia ?? []),
     grade: initial?.grade ?? null,
     completed: initial?.completed ?? false,
     notes: initial?.notes ?? '',
@@ -64,9 +67,7 @@ function toInput(s: FormState): RouteInput {
   return {
     name: trimmedName.length > 0 ? trimmedName : null,
     gymName: s.gymName,
-    photoUri: s.photo?.uri ?? null,
-    photoWidth: s.photo?.width ?? null,
-    photoHeight: s.photo?.height ?? null,
+    media: s.media,
     grade: s.grade,
     completed: s.completed,
     notes: trimmedNotes.length > 0 ? trimmedNotes : null,
@@ -78,13 +79,14 @@ function toInput(s: FormState): RouteInput {
 /** Shared add/edit field set. Validates on submit; both screens reuse this. */
 export function RouteForm({
   initial,
-  initialPhotoUri,
+  initialMedia,
   submitLabel,
   onSubmit,
   onCancel,
 }: RouteFormProps): React.JSX.Element {
   const { colors } = useTheme();
-  const [state, setState] = useState<FormState>(() => toState(initial, initialPhotoUri));
+  const headerHeight = useHeaderHeight();
+  const [state, setState] = useState<FormState>(() => toState(initial, initialMedia));
   const [errors, setErrors] = useState<ReturnType<typeof validateRouteInput>['errors']>({});
   const [saving, setSaving] = useState(false);
   const [datePickerField, setDatePickerField] = useState<'started' | 'completed' | null>(null);
@@ -115,12 +117,32 @@ export function RouteForm({
       completed: value,
       completedAt: value ? (state.completedAt ?? startOfDayMs(Date.now())) : null,
     });
+    // Celebrate a send and offer to attach a video straight away.
+    if (value) {
+      confirmAddVideo(() => {
+        void pickVideoFromLibrary().then((video) => {
+          if (video !== null) {
+            setState((prev) => ({ ...prev, media: addMedia(prev.media, [video]) }));
+          }
+        });
+      });
+    }
   }
 
   return (
-    <View style={styles.form}>
-      <Field label="Photo">
-        <PhotoPickerField value={state.photo} onChange={(photo) => patch({ photo })} />
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={headerHeight}
+    >
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.form}>
+      <Field label="Photos & videos">
+        <MediaGalleryField value={state.media} onChange={(media) => patch({ media })} />
       </Field>
 
       <Field label="Gym / location" required error={errors.gymName}>
@@ -185,7 +207,17 @@ export function RouteForm({
         />
       </Field>
 
-      <View style={styles.actions}>
+        </View>
+      </ScrollView>
+
+      {/* Pinned footer: stays above the keyboard so Cancel/Save are always
+          reachable, including while editing the multiline notes field. */}
+      <View
+        style={[
+          styles.footer,
+          { backgroundColor: colors.background, borderTopColor: colors.border },
+        ]}
+      >
         {onCancel !== undefined && (
           <Pressable
             onPress={onCancel}
@@ -218,7 +250,7 @@ export function RouteForm({
         }}
         onCancel={() => setDatePickerField(null)}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -346,6 +378,14 @@ function inputColors(colors: ReturnType<typeof useTheme>['colors']) {
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: SPACING.lg,
+    paddingBottom: SPACING.lg,
+    flexGrow: 1,
+  },
   form: {
     gap: SPACING.lg,
   },
@@ -470,10 +510,13 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
   },
-  actions: {
+  footer: {
     flexDirection: 'row',
     gap: SPACING.md,
-    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   btn: {
     flex: 1,

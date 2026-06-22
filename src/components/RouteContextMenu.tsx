@@ -5,6 +5,7 @@ import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useRouteStore } from '@/store/useRouteStore';
 import { routeToInput } from '@/utils/routeInput';
+import { useAddVideoPrompt } from '@/hooks/useAddVideoPrompt';
 import type { RouteWithGym } from '@/types';
 
 /** Long-press anchor: horizontal center plus the tile's top/bottom edges. */
@@ -30,21 +31,27 @@ export function RouteContextMenu({ visible, route, anchor, onDismiss, onEdit }: 
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const editRoute = useRouteStore((s) => s.editRoute);
   const removeRoute = useRouteStore((s) => s.removeRoute);
+  const promptAddVideo = useAddVideoPrompt();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const menuRef = useRef<View>(null);
 
   const handleMarkCompleted = useCallback(() => {
     if (!route) return;
     const nextCompleted = !route.completed;
-    void editRoute(
-      route.id,
-      routeToInput(route, {
-        completed: nextCompleted,
-        completedAt: nextCompleted ? route.completedAt ?? Date.now() : null,
-      }),
-    );
+    const routeId = route.id;
     onDismiss();
-  }, [route, editRoute, onDismiss]);
+    void (async () => {
+      await editRoute(
+        routeId,
+        routeToInput(route, {
+          completed: nextCompleted,
+          completedAt: nextCompleted ? route.completedAt ?? Date.now() : null,
+        }),
+      );
+      // Offer to attach a send video right after a completion.
+      if (nextCompleted) promptAddVideo(routeId);
+    })();
+  }, [route, editRoute, onDismiss, promptAddVideo]);
 
   const handleDelete = useCallback(() => {
     setShowDeleteConfirm(true);

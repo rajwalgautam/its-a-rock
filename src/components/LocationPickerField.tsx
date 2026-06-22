@@ -15,7 +15,7 @@ interface LocationPickerFieldProps {
 export function LocationPickerField({
   value,
   onChange,
-  placeholder = 'Movement Englewood or Denver, CO',
+  placeholder = 'Add location here',
 }: LocationPickerFieldProps): React.JSX.Element {
   const { colors } = useTheme();
   const gyms = useRouteStore((s) => s.gyms);

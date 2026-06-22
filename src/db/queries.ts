@@ -1,6 +1,13 @@
 import { getDatabase } from './database';
 import { formatGymName, normalizeGymName } from '@/utils/gymUtils';
-import type { Gym, RouteFilters, RouteInput, RouteWithGym } from '@/types';
+import type {
+  Gym,
+  MediaItem,
+  RouteFilters,
+  RouteInput,
+  RouteMedia,
+  RouteWithGym,
+} from '@/types';
 
 interface GymRow {
   id: number;
@@ -43,6 +50,30 @@ const ROUTE_SELECT = `
   JOIN gyms g ON g.id = r.gym_id
 `;
 
+interface RouteMediaRow {
+  id: number;
+  route_id: number;
+  uri: string;
+  type: string;
+  width: number | null;
+  height: number | null;
+  position: number;
+  created_at: number;
+}
+
+function mapMedia(row: RouteMediaRow): RouteMedia {
+  return {
+    id: row.id,
+    routeId: row.route_id,
+    uri: row.uri,
+    type: row.type === 'video' ? 'video' : 'photo',
+    width: row.width,
+    height: row.height,
+    position: row.position,
+    createdAt: row.created_at,
+  };
+}
+
 function mapGym(row: GymRow): Gym {
   return {
     id: row.id,
@@ -68,6 +99,9 @@ function mapRoute(row: RouteJoinRow): RouteWithGym {
     completedAt: row.completed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    // Populated by getRouteById; list queries leave the gallery empty and rely
+    // on the cached cover (photoUri) for tiles.
+    media: [],
     gym: {
       id: row.gym_id,
       name: row.gym_name,
@@ -76,6 +110,37 @@ function mapRoute(row: RouteJoinRow): RouteWithGym {
       updatedAt: row.gym_updated_at,
     },
   };
+}
+
+/** First photo in gallery order, used as the cached tile cover. */
+function coverPhoto(media: MediaItem[]): MediaItem | null {
+  return media.find((m) => m.type === 'photo') ?? null;
+}
+
+async function replaceRouteMedia(
+  db: ReturnType<typeof getDatabase>,
+  routeId: number,
+  media: MediaItem[],
+  now: number,
+): Promise<void> {
+  await db.runAsync('DELETE FROM route_media WHERE route_id = ?', [routeId]);
+  for (let i = 0; i < media.length; i++) {
+    const m = media[i]!;
+    await db.runAsync(
+      `INSERT INTO route_media (route_id, uri, type, width, height, position, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [routeId, m.uri, m.type, m.width ?? null, m.height ?? null, i, now],
+    );
+  }
+}
+
+export async function getRouteMedia(routeId: number): Promise<RouteMedia[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<RouteMediaRow>(
+    'SELECT * FROM route_media WHERE route_id = ? ORDER BY position ASC, id ASC',
+    [routeId],
+  );
+  return rows.map(mapMedia);
 }
 
 /**
@@ -113,58 +178,103 @@ async function getRouteByIdOrThrow(id: number): Promise<RouteWithGym> {
   return route;
 }
 
+/**
+ * Resolve the gallery to persist for an input. `media` is authoritative when
+ * provided; otherwise a legacy single `photoUri` seeds a one-item gallery.
+ */
+function resolveMedia(input: RouteInput): MediaItem[] {
+  if (input.media !== undefined) return input.media;
+  if (input.photoUri != null && input.photoUri.length > 0) {
+    return [
+      {
+        uri: input.photoUri,
+        type: 'photo',
+        width: input.photoWidth ?? null,
+        height: input.photoHeight ?? null,
+      },
+    ];
+  }
+  return [];
+}
+
 export async function createRoute(input: RouteInput): Promise<RouteWithGym> {
   const db = getDatabase();
   const now = Date.now();
   const gymId = await upsertGym(input.gymName, now);
-  const result = await db.runAsync(
-    `INSERT INTO routes
-       (name, gym_id, photo_uri, photo_width, photo_height, grade, completed,
-        notes, started_at, completed_at, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      input.name ?? null,
-      gymId,
-      input.photoUri ?? null,
-      input.photoWidth ?? null,
-      input.photoHeight ?? null,
-      input.grade ?? null,
-      input.completed ? 1 : 0,
-      input.notes ?? null,
-      input.startedAt ?? null,
-      input.completedAt ?? null,
-      now,
-      now,
-    ],
-  );
-  return getRouteByIdOrThrow(result.lastInsertRowId);
+  const media = resolveMedia(input);
+  const cover = coverPhoto(media);
+  let newId = 0;
+  await db.withTransactionAsync(async () => {
+    const result = await db.runAsync(
+      `INSERT INTO routes
+         (name, gym_id, photo_uri, photo_width, photo_height, grade, completed,
+          notes, started_at, completed_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        input.name ?? null,
+        gymId,
+        cover?.uri ?? null,
+        cover?.width ?? null,
+        cover?.height ?? null,
+        input.grade ?? null,
+        input.completed ? 1 : 0,
+        input.notes ?? null,
+        input.startedAt ?? null,
+        input.completedAt ?? null,
+        now,
+        now,
+      ],
+    );
+    newId = result.lastInsertRowId;
+    await replaceRouteMedia(db, newId, media, now);
+  });
+  return getRouteByIdOrThrow(newId);
 }
 
 export async function updateRoute(id: number, input: RouteInput): Promise<RouteWithGym> {
   const db = getDatabase();
   const now = Date.now();
   const gymId = await upsertGym(input.gymName, now);
-  await db.runAsync(
-    `UPDATE routes SET
-       name = ?, gym_id = ?, photo_uri = ?, photo_width = ?, photo_height = ?,
-       grade = ?, completed = ?, notes = ?, started_at = ?, completed_at = ?,
-       updated_at = ?
-     WHERE id = ?`,
-    [
-      input.name ?? null,
-      gymId,
-      input.photoUri ?? null,
-      input.photoWidth ?? null,
-      input.photoHeight ?? null,
-      input.grade ?? null,
-      input.completed ? 1 : 0,
-      input.notes ?? null,
-      input.startedAt ?? null,
-      input.completedAt ?? null,
-      now,
-      id,
-    ],
-  );
+  // When `media` is provided it's authoritative; the cover is its first photo.
+  // When omitted (e.g. a quick completion toggle), the gallery is left intact
+  // and the existing cached cover (input.photoUri) is preserved.
+  const cover =
+    input.media !== undefined
+      ? coverPhoto(input.media)
+      : input.photoUri != null && input.photoUri.length > 0
+        ? {
+            uri: input.photoUri,
+            type: 'photo' as const,
+            width: input.photoWidth ?? null,
+            height: input.photoHeight ?? null,
+          }
+        : null;
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE routes SET
+         name = ?, gym_id = ?, photo_uri = ?, photo_width = ?, photo_height = ?,
+         grade = ?, completed = ?, notes = ?, started_at = ?, completed_at = ?,
+         updated_at = ?
+       WHERE id = ?`,
+      [
+        input.name ?? null,
+        gymId,
+        cover?.uri ?? null,
+        cover?.width ?? null,
+        cover?.height ?? null,
+        input.grade ?? null,
+        input.completed ? 1 : 0,
+        input.notes ?? null,
+        input.startedAt ?? null,
+        input.completedAt ?? null,
+        now,
+        id,
+      ],
+    );
+    if (input.media !== undefined) {
+      await replaceRouteMedia(db, id, input.media, now);
+    }
+  });
   return getRouteByIdOrThrow(id);
 }
 
@@ -176,7 +286,10 @@ export async function deleteRoute(id: number): Promise<void> {
 export async function getRouteById(id: number): Promise<RouteWithGym | null> {
   const db = getDatabase();
   const row = await db.getFirstAsync<RouteJoinRow>(`${ROUTE_SELECT} WHERE r.id = ?`, [id]);
-  return row === null ? null : mapRoute(row);
+  if (row === null) return null;
+  const route = mapRoute(row);
+  route.media = await getRouteMedia(id);
+  return route;
 }
 
 export async function getRoutes(filters: RouteFilters = {}): Promise<RouteWithGym[]> {

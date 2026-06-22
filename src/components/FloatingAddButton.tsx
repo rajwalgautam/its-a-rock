@@ -5,59 +5,67 @@ import * as ImagePicker from 'expo-image-picker';
 import { Alert, Pressable, StyleSheet, Text, View, useWindowDimensions, type ViewStyle } from 'react-native';
 import { FONT_SIZE, RADIUS, SHADOW, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
+import { assetToMediaItem } from '@/utils/mediaUtils';
+import type { MediaItem } from '@/types';
 
 interface FloatingAddButtonProps {
-  onPress: (photoUri?: string) => void;
+  onPress: (seed?: MediaItem) => void;
   /** Extra positioning overrides (e.g. to clear the tab bar). */
   style?: ViewStyle;
 }
 
-const PICK_OPTIONS: ImagePicker.ImagePickerOptions = {
+const LIBRARY_OPTIONS: ImagePicker.ImagePickerOptions = {
+  mediaTypes: ['images', 'videos'],
+  quality: 0.8,
+};
+
+const CAMERA_PHOTO_OPTIONS: ImagePicker.ImagePickerOptions = {
   mediaTypes: ['images'],
   quality: 0.8,
-  // Surfaces the OS crop/zoom UI right after picking or shooting.
+  // Surfaces the OS crop/zoom UI right after shooting.
   allowsEditing: true,
 };
 
-const MENU_WIDTH = 200;
-const MENU_HEIGHT = 100;
+const CAMERA_VIDEO_OPTIONS: ImagePicker.ImagePickerOptions = {
+  mediaTypes: ['videos'],
+  quality: 0.8,
+};
 
-/** Prominent bottom-centered `+` FAB with photo selection menu. */
+const MENU_WIDTH = 200;
+const MENU_HEIGHT = 150;
+
+/** Prominent bottom-centered `+` FAB with photo/video selection menu. */
 export function FloatingAddButton({ onPress, style }: FloatingAddButtonProps): React.JSX.Element {
   const { colors } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const [menuVisible, setMenuVisible] = useState(false);
   const menuRef = useRef<View>(null);
 
+  function seedFrom(result: ImagePicker.ImagePickerResult): void {
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (asset === undefined) return;
+    onPress(assetToMediaItem(asset));
+  }
+
   async function pickFromLibrary(): Promise<void> {
     setMenuVisible(false);
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Permission needed', 'Allow photo library access to attach a climb photo.');
+      Alert.alert('Permission needed', 'Allow library access to attach a photo or video.');
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync(PICK_OPTIONS);
-    if (result.canceled) return;
-    const asset = result.assets[0];
-    if (asset === undefined) return;
-    onPress(asset.uri);
+    seedFrom(await ImagePicker.launchImageLibraryAsync(LIBRARY_OPTIONS));
   }
 
-  async function takePhoto(): Promise<void> {
+  async function capture(options: ImagePicker.ImagePickerOptions): Promise<void> {
     setMenuVisible(false);
     const cameraPerm = await ImagePicker.requestCameraPermissionsAsync();
     if (!cameraPerm.granted) {
-      Alert.alert('Permission needed', 'Allow camera access to take a climb photo.');
+      Alert.alert('Permission needed', 'Allow camera access to capture a photo or video.');
       return;
     }
-
-    const result = await ImagePicker.launchCameraAsync(PICK_OPTIONS);
-    if (result.canceled) return;
-
-    const asset = result.assets[0];
-    if (asset === undefined) return;
-
-    onPress(asset.uri);
+    seedFrom(await ImagePicker.launchCameraAsync(options));
   }
 
   function toggleMenu(): void {
@@ -85,12 +93,19 @@ export function FloatingAddButton({ onPress, style }: FloatingAddButtonProps): R
             <MenuItem
               label="Camera"
               icon="camera"
-              onPress={() => void takePhoto()}
+              onPress={() => void capture(CAMERA_PHOTO_OPTIONS)}
               colors={colors}
             />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <MenuItem
-              label="Photo Library"
+              label="Record Video"
+              icon="videocam"
+              onPress={() => void capture(CAMERA_VIDEO_OPTIONS)}
+              colors={colors}
+            />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <MenuItem
+              label="Library"
               icon="image"
               onPress={() => void pickFromLibrary()}
               colors={colors}

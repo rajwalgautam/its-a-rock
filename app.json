@@ -24,6 +24,7 @@
       "expo-sqlite",
       "expo-image-picker",
       "expo-media-library",
+      "expo-video",
       "./plugins/withAndroidCompileSdk",
       "./plugins/withAndroidMaterialPin",
       "./plugins/withAndroidSigning",

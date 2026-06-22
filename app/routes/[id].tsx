@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { FONT_SIZE, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -39,15 +39,7 @@ export default function RouteDetail(): React.JSX.Element {
   );
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        style={styles.root}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-      >
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
       {state.status === 'loading' && <ActivityIndicator color={colors.primary} style={styles.center} />}
       {state.status === 'missing' && (
         <View style={styles.center}>
@@ -59,19 +51,13 @@ export default function RouteDetail(): React.JSX.Element {
       {state.status === 'ready' && (
         <RouteCard route={state.route} onSaved={(route) => setState({ status: 'ready', route })} />
       )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-  },
-  content: {
-    padding: SPACING.lg,
-    paddingBottom: SPACING.xxl,
-    flexGrow: 1,
   },
   center: {
     flex: 1,

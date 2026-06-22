@@ -8,6 +8,7 @@ import { useSettingsStore } from '@/store/useSettingsStore';
 import { useUpdateStore } from '@/store/useUpdateStore';
 import { cleanupPendingApk } from '@/utils/updateChecker';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
+import { WhatsNewGate } from '@/components/WhatsNewGate';
 
 export default function RootLayout(): React.JSX.Element {
   const [ready, setReady] = useState(false);
@@ -33,6 +34,7 @@ export default function RootLayout(): React.JSX.Element {
       <ThemeProvider>
         <StatusBar style="auto" />
         {ready ? <Navigator /> : <SplashFallback />}
+        {ready && <WhatsNewGate />}
       </ThemeProvider>
     </SafeAreaProvider>
   );
@@ -51,6 +53,7 @@ function Navigator(): React.JSX.Element {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="routes/new" options={{ title: 'Add a climb', presentation: 'modal' }} />
       <Stack.Screen name="routes/[id]" options={{ title: 'Climb' }} />
+      <Stack.Screen name="releases" options={{ title: 'Release notes' }} />
     </Stack>
   );
 }
