@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { GradePicker } from '@/components/GradePicker';
@@ -17,6 +20,8 @@ import { LocationPickerField } from '@/components/LocationPickerField';
 import { formatDate } from '@/utils/formatters';
 import { startOfDayMs } from '@/utils/dateUtils';
 import { validateRouteInput } from '@/utils/validators';
+import { addMedia } from '@/utils/mediaUtils';
+import { confirmAddVideo, pickVideoFromLibrary } from '@/utils/mediaPicker';
 import type { MediaItem, RouteInput, RouteWithGym } from '@/types';
 
 interface RouteFormProps {
@@ -80,6 +85,7 @@ export function RouteForm({
   onCancel,
 }: RouteFormProps): React.JSX.Element {
   const { colors } = useTheme();
+  const headerHeight = useHeaderHeight();
   const [state, setState] = useState<FormState>(() => toState(initial, initialMedia));
   const [errors, setErrors] = useState<ReturnType<typeof validateRouteInput>['errors']>({});
   const [saving, setSaving] = useState(false);
@@ -111,10 +117,30 @@ export function RouteForm({
       completed: value,
       completedAt: value ? (state.completedAt ?? startOfDayMs(Date.now())) : null,
     });
+    // Celebrate a send and offer to attach a video straight away.
+    if (value) {
+      confirmAddVideo(() => {
+        void pickVideoFromLibrary().then((video) => {
+          if (video !== null) {
+            setState((prev) => ({ ...prev, media: addMedia(prev.media, [video]) }));
+          }
+        });
+      });
+    }
   }
 
   return (
-    <View style={styles.form}>
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={headerHeight}
+    >
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.form}>
       <Field label="Photos & videos">
         <MediaGalleryField value={state.media} onChange={(media) => patch({ media })} />
       </Field>
@@ -181,7 +207,17 @@ export function RouteForm({
         />
       </Field>
 
-      <View style={styles.actions}>
+        </View>
+      </ScrollView>
+
+      {/* Pinned footer: stays above the keyboard so Cancel/Save are always
+          reachable, including while editing the multiline notes field. */}
+      <View
+        style={[
+          styles.footer,
+          { backgroundColor: colors.background, borderTopColor: colors.border },
+        ]}
+      >
         {onCancel !== undefined && (
           <Pressable
             onPress={onCancel}
@@ -214,7 +250,7 @@ export function RouteForm({
         }}
         onCancel={() => setDatePickerField(null)}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -342,6 +378,14 @@ function inputColors(colors: ReturnType<typeof useTheme>['colors']) {
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: SPACING.lg,
+    paddingBottom: SPACING.lg,
+    flexGrow: 1,
+  },
   form: {
     gap: SPACING.lg,
   },
@@ -466,10 +510,13 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
   },
-  actions: {
+  footer: {
     flexDirection: 'row',
     gap: SPACING.md,
-    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   btn: {
     flex: 1,

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -31,15 +31,14 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
   }
 
   if (editing) {
+    // RouteForm owns its own scroll + pinned footer, so it fills the screen.
     return (
-      <View style={styles.container}>
-        <RouteForm
-          initial={current}
-          submitLabel="Save"
-          onSubmit={handleSave}
-          onCancel={() => setEditing(false)}
-        />
-      </View>
+      <RouteForm
+        initial={current}
+        submitLabel="Save"
+        onSubmit={handleSave}
+        onCancel={() => setEditing(false)}
+      />
     );
   }
 
@@ -49,7 +48,11 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
   const videoCount = media.filter((m) => m.type === 'video').length;
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.flex}
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+    >
       {hasMedia && (
         <>
           <Pressable
@@ -117,7 +120,7 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
         <Ionicons name="create-outline" size={18} color={colors.primary} />
         <Text style={[styles.editText, { color: colors.primary }]}>Edit</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -143,8 +146,13 @@ function DetailRow({
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   container: {
     gap: SPACING.md,
+    padding: SPACING.lg,
+    paddingBottom: SPACING.xxl,
   },
   photo: {
     width: '100%',

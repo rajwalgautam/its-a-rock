@@ -1,6 +1,5 @@
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { RouteForm } from '@/components/RouteForm';
 import { useRouteStore } from '@/store/useRouteStore';
@@ -21,29 +20,21 @@ export default function NewRoute(): React.JSX.Element {
     router.back();
   }
 
+  // RouteForm owns its own scroll + keyboard-avoiding layout (pinned footer).
   return (
-    <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <RouteForm
-          initialMedia={initialMedia}
-          submitLabel="Add climb"
-          onSubmit={handleSubmit}
-          onCancel={() => router.back()}
-        />
-      </ScrollView>
-    </KeyboardAvoidingView>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <RouteForm
+        initialMedia={initialMedia}
+        submitLabel="Add climb"
+        onSubmit={handleSubmit}
+        onCancel={() => router.back()}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-  },
-  content: {
-    padding: SPACING.lg,
-    paddingBottom: SPACING.xxl,
   },
 });
