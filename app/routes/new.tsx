@@ -4,12 +4,17 @@ import { SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { RouteForm } from '@/components/RouteForm';
 import { useRouteStore } from '@/store/useRouteStore';
-import type { RouteInput } from '@/types';
+import type { MediaItem, RouteInput } from '@/types';
 
 export default function NewRoute(): React.JSX.Element {
   const { colors } = useTheme();
-  const { photoUri } = useLocalSearchParams<{ photoUri?: string }>();
+  const { uri, type } = useLocalSearchParams<{ uri?: string; type?: string }>();
   const addRoute = useRouteStore((s) => s.addRoute);
+
+  const initialMedia: MediaItem[] | undefined =
+    uri !== undefined
+      ? [{ uri, type: type === 'video' ? 'video' : 'photo', width: null, height: null }]
+      : undefined;
 
   async function handleSubmit(input: RouteInput): Promise<void> {
     await addRoute(input);
@@ -23,7 +28,7 @@ export default function NewRoute(): React.JSX.Element {
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <RouteForm
-          initialPhotoUri={photoUri}
+          initialMedia={initialMedia}
           submitLabel="Add climb"
           onSubmit={handleSubmit}
           onCancel={() => router.back()}

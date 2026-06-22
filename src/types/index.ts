@@ -26,10 +26,34 @@ export interface Gym {
   updatedAt: number;
 }
 
+export type MediaType = 'photo' | 'video';
+
+/** A persisted photo/video attached to a route. */
+export interface RouteMedia {
+  readonly id: number;
+  routeId: number;
+  uri: string;
+  type: MediaType;
+  width: number | null;
+  height: number | null;
+  /** Order within the route's gallery; lower comes first. */
+  position: number;
+  createdAt: number;
+}
+
+/** A media item in the form, before it has been persisted. */
+export interface MediaItem {
+  uri: string;
+  type: MediaType;
+  width: number | null;
+  height: number | null;
+}
+
 export interface BoulderRoute {
   readonly id: number;
   name: string | null;
   gymId: number;
+  /** Cached cover image (first photo in the gallery), used by tiles/cards. */
   photoUri: string | null;
   photoWidth: number | null;
   photoHeight: number | null;
@@ -45,12 +69,17 @@ export interface BoulderRoute {
 
 export interface RouteWithGym extends BoulderRoute {
   gym: Gym;
+  /** Full gallery, populated on detail loads; empty in list queries. */
+  media: RouteMedia[];
 }
 
 export interface RouteInput {
   name?: string | null;
   /** Resolved/created into a gym row by normalized name. */
   gymName: string;
+  /** Full gallery to persist. Omit (undefined) to leave existing media untouched. */
+  media?: MediaItem[];
+  /** Legacy single-photo seed; used only when `media` is omitted. */
   photoUri?: string | null;
   photoWidth?: number | null;
   photoHeight?: number | null;

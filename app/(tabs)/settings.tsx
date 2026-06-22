@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { FONT_SIZE, RADIUS, SHADOW, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -122,6 +124,11 @@ export default function Settings(): React.JSX.Element {
           <Text style={[styles.lastChecked, { color: colors.textMuted }]}>
             {formatLastChecked(lastChecked)}
           </Text>
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          <Pressable style={styles.row} onPress={() => router.push('/releases')}>
+            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Release notes</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Pressable>
         </View>
       </ScrollView>
     </SafeAreaView>

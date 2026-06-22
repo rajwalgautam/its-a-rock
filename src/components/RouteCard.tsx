@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { RouteForm } from '@/components/RouteForm';
-import { PhotoViewer } from '@/components/PhotoViewer';
+import { MediaViewer } from '@/components/MediaViewer';
 import { useRouteStore } from '@/store/useRouteStore';
 import { formatDate, formatGradeLabel, statusLabel } from '@/utils/formatters';
 import type { RouteInput, RouteWithGym } from '@/types';
@@ -43,21 +43,38 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
     );
   }
 
-  const hasPhoto = current.photoUri !== null && current.photoUri.length > 0;
+  const media = current.media;
+  const hasMedia = media.length > 0;
+  const coverUri = current.photoUri;
+  const videoCount = media.filter((m) => m.type === 'video').length;
 
   return (
     <View style={styles.container}>
-      {hasPhoto && (
+      {hasMedia && (
         <>
           <Pressable
             onPress={() => setViewerOpen(true)}
             accessibilityRole="imagebutton"
-            accessibilityLabel="View photo full screen"
+            accessibilityLabel="View media full screen"
           >
-            <Image source={{ uri: current.photoUri! }} style={styles.photo} resizeMode="cover" />
+            {coverUri !== null && coverUri.length > 0 ? (
+              <Image source={{ uri: coverUri }} style={styles.photo} resizeMode="cover" />
+            ) : (
+              <View style={[styles.photo, styles.videoCover, { backgroundColor: colors.tilePlaceholder }]}>
+                <Ionicons name="play-circle" size={56} color={colors.onOverlay} />
+              </View>
+            )}
+            {(media.length > 1 || videoCount > 0) && (
+              <View style={[styles.mediaBadge, { backgroundColor: colors.overlay }]}>
+                {videoCount > 0 && <Ionicons name="videocam" size={14} color={colors.onOverlay} />}
+                <Text style={[styles.mediaBadgeText, { color: colors.onOverlay }]}>
+                  {media.length}
+                </Text>
+              </View>
+            )}
           </Pressable>
-          <PhotoViewer
-            uri={current.photoUri}
+          <MediaViewer
+            media={media.map((m) => ({ uri: m.uri, type: m.type }))}
             visible={viewerOpen}
             onClose={() => setViewerOpen(false)}
           />
@@ -133,6 +150,25 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 280,
     borderRadius: RADIUS.lg,
+  },
+  videoCover: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mediaBadge: {
+    position: 'absolute',
+    top: SPACING.sm,
+    right: SPACING.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.full,
+  },
+  mediaBadgeText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
   },
   headerRow: {
     flexDirection: 'row',

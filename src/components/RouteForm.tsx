@@ -12,18 +12,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { GradePicker } from '@/components/GradePicker';
-import { PhotoPickerField, type PhotoValue } from '@/components/PhotoPickerField';
+import { MediaGalleryField } from '@/components/MediaGalleryField';
 import { LocationPickerField } from '@/components/LocationPickerField';
 import { formatDate } from '@/utils/formatters';
 import { startOfDayMs } from '@/utils/dateUtils';
 import { validateRouteInput } from '@/utils/validators';
-import type { RouteInput, RouteWithGym } from '@/types';
+import type { MediaItem, RouteInput, RouteWithGym } from '@/types';
 
 interface RouteFormProps {
   /** Existing route to edit; omit for a new climb. */
   initial?: RouteWithGym;
-  /** Pre-selected photo URI for a new climb (from FAB). */
-  initialPhotoUri?: string;
+  /** Pre-selected media for a new climb (from the FAB). */
+  initialMedia?: MediaItem[];
   submitLabel: string;
   onSubmit: (input: RouteInput) => Promise<void> | void;
   onCancel?: () => void;
@@ -32,7 +32,7 @@ interface RouteFormProps {
 interface FormState {
   name: string;
   gymName: string;
-  photo: PhotoValue | null;
+  media: MediaItem[];
   grade: string | null;
   completed: boolean;
   notes: string;
@@ -40,16 +40,14 @@ interface FormState {
   completedAt: number | null;
 }
 
-function toState(initial?: RouteWithGym, initialPhotoUri?: string): FormState {
+function toState(initial?: RouteWithGym, initialMedia?: MediaItem[]): FormState {
   return {
     name: initial?.name ?? '',
     gymName: initial?.gym.name ?? '',
-    photo:
-      initial?.photoUri != null
-        ? { uri: initial.photoUri, width: initial.photoWidth, height: initial.photoHeight }
-        : initialPhotoUri
-          ? { uri: initialPhotoUri, width: null, height: null }
-          : null,
+    media:
+      initial !== undefined
+        ? initial.media.map((m) => ({ uri: m.uri, type: m.type, width: m.width, height: m.height }))
+        : (initialMedia ?? []),
     grade: initial?.grade ?? null,
     completed: initial?.completed ?? false,
     notes: initial?.notes ?? '',
@@ -64,9 +62,7 @@ function toInput(s: FormState): RouteInput {
   return {
     name: trimmedName.length > 0 ? trimmedName : null,
     gymName: s.gymName,
-    photoUri: s.photo?.uri ?? null,
-    photoWidth: s.photo?.width ?? null,
-    photoHeight: s.photo?.height ?? null,
+    media: s.media,
     grade: s.grade,
     completed: s.completed,
     notes: trimmedNotes.length > 0 ? trimmedNotes : null,
@@ -78,13 +74,13 @@ function toInput(s: FormState): RouteInput {
 /** Shared add/edit field set. Validates on submit; both screens reuse this. */
 export function RouteForm({
   initial,
-  initialPhotoUri,
+  initialMedia,
   submitLabel,
   onSubmit,
   onCancel,
 }: RouteFormProps): React.JSX.Element {
   const { colors } = useTheme();
-  const [state, setState] = useState<FormState>(() => toState(initial, initialPhotoUri));
+  const [state, setState] = useState<FormState>(() => toState(initial, initialMedia));
   const [errors, setErrors] = useState<ReturnType<typeof validateRouteInput>['errors']>({});
   const [saving, setSaving] = useState(false);
   const [datePickerField, setDatePickerField] = useState<'started' | 'completed' | null>(null);
@@ -119,8 +115,8 @@ export function RouteForm({
 
   return (
     <View style={styles.form}>
-      <Field label="Photo">
-        <PhotoPickerField value={state.photo} onChange={(photo) => patch({ photo })} />
+      <Field label="Photos & videos">
+        <MediaGalleryField value={state.media} onChange={(media) => patch({ media })} />
       </Field>
 
       <Field label="Gym / location" required error={errors.gymName}>

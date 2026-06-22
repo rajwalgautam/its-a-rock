@@ -9,6 +9,7 @@ import {
 import * as IntentLauncher from "expo-intent-launcher";
 import { Linking, Platform } from "react-native";
 import { isNewerVersion } from "./versionCompare";
+import { stripUnderTheHood } from "./changelog";
 
 export { formatLastChecked, isNewerVersion } from "./versionCompare";
 
@@ -16,10 +17,18 @@ export const RELEASES_REPO = "rajwalgautam/its-a-rock";
 const RELEASE_API_URL = `https://api.github.com/repos/${RELEASES_REPO}/releases/latest`;
 export const releaseTagUrl = (version: string): string =>
   `https://github.com/${RELEASES_REPO}/releases/tag/v${version.replace(/^v/, "")}`;
+/** Public releases page, used as the "view all" link-out. */
+export const releasesUrl = `https://github.com/${RELEASES_REPO}/releases`;
+/** Raw changelog file for a tag — the single source of user-facing notes. */
+export const changelogRawUrl = (version: string): string => {
+  const v = version.replace(/^v/, "");
+  return `https://raw.githubusercontent.com/${RELEASES_REPO}/v${v}/changelogs/v${v}.md`;
+};
 
 const STORAGE_KEYS = {
   lastChecked: "@itsarock/last_update_check_at",
   lastNotified: "@itsarock/last_notified_version",
+  lastSeen: "@itsarock/last_seen_version",
   pendingApk: "@itsarock/pending_apk_path",
 } as const;
 
@@ -60,6 +69,58 @@ export async function getLastNotifiedVersion(): Promise<string | null> {
 
 export async function markVersionNotified(version: string): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEYS.lastNotified, version);
+}
+
+/** The app version whose "What's new" notes the user has already seen. */
+export async function getLastSeenVersion(): Promise<string | null> {
+  return AsyncStorage.getItem(STORAGE_KEYS.lastSeen);
+}
+
+export async function markVersionSeen(version: string): Promise<void> {
+  await AsyncStorage.setItem(STORAGE_KEYS.lastSeen, version);
+}
+
+/**
+ * Fetch the user-facing changelog (truncated at "## Under the hood") for a
+ * version's tag. Returns null on any network/parse error so callers degrade
+ * gracefully — the app stays offline-first.
+ */
+export async function fetchChangelog(version: string): Promise<string | null> {
+  try {
+    const res = await fetch(changelogRawUrl(version));
+    if (!res.ok) return null;
+    return stripUnderTheHood(await res.text());
+  } catch {
+    return null;
+  }
+}
+
+export interface ReleaseSummary {
+  tag: string;
+  name: string;
+  /** ISO 8601 timestamp from the GitHub API. */
+  publishedAt: string;
+  url: string;
+}
+
+/** The most recent releases (newest first) from the GitHub releases API. */
+export async function fetchRecentReleases(limit = 10): Promise<ReleaseSummary[]> {
+  const res = await fetch(
+    `https://api.github.com/repos/${RELEASES_REPO}/releases?per_page=${limit}`,
+  );
+  if (!res.ok) throw new Error(`Failed to load releases: ${res.status}`);
+  const data = (await res.json()) as Array<{
+    tag_name?: string;
+    name?: string;
+    published_at?: string;
+    html_url?: string;
+  }>;
+  return data.map((r) => ({
+    tag: r.tag_name ?? "",
+    name: r.name ?? r.tag_name ?? "",
+    publishedAt: r.published_at ?? "",
+    url: r.html_url ?? releasesUrl,
+  }));
 }
 
 export async function findApkAssetUrl(): Promise<string | null> {
