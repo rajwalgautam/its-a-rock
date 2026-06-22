@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -40,16 +40,20 @@ export function LocationPickerField({
     }
   }, [routes, onChange]);
 
-  const suggestions = gyms
-    .filter(
-      (g) =>
-        value.length > 0 &&
-        g.name.toLowerCase().includes(value.toLowerCase()),
-    )
-    .slice(0, 5)
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const isTyping = value.length > 0;
 
-  const hasMatches = suggestions.length > 0;
+  // Empty field → browse all saved locations; typing → filter to matches.
+  const sorted = [...gyms].sort((a, b) => a.name.localeCompare(b.name));
+  const listed = isTyping
+    ? sorted
+        .filter((g) => g.name.toLowerCase().includes(value.toLowerCase()))
+        .slice(0, 5)
+    : sorted;
+
+  function select(name: string): void {
+    onChange(name);
+    setShowDropdown(false);
+  }
 
   return (
     <View style={styles.container}>
@@ -58,44 +62,46 @@ export function LocationPickerField({
           value={value}
           onChangeText={onChange}
           onFocus={() => setShowDropdown(true)}
-          onBlur={() => setTimeout(() => setShowDropdown(false), 100)}
+          onBlur={() => setShowDropdown(false)}
           placeholder={placeholder}
           placeholderTextColor={colors.textMuted}
           style={[styles.input, inputColors(colors)]}
         />
-        {value.length > 0 && (
+        {isTyping ? (
           <Pressable
             onPress={() => {
               onChange('');
               setShowDropdown(true);
             }}
-            style={styles.clearButton}
+            style={styles.trailingButton}
             hitSlop={8}
+            accessibilityLabel="Clear location"
           >
             <Ionicons name="close" size={20} color={colors.textMuted} />
           </Pressable>
+        ) : (
+          <Pressable
+            onPress={() => setShowDropdown((s) => !s)}
+            style={styles.trailingButton}
+            hitSlop={8}
+            accessibilityLabel="Show saved locations"
+          >
+            <Ionicons name="chevron-down" size={20} color={colors.textMuted} />
+          </Pressable>
         )}
-        <Ionicons
-          name="chevron-down"
-          size={20}
-          color={colors.textMuted}
-          style={styles.dropdownIcon}
-          pointerEvents="none"
-        />
       </View>
-      {showDropdown && value.length > 0 && (
+      {showDropdown && (
         <View style={[styles.dropdown, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {hasMatches ? (
-            <FlatList
-              data={suggestions}
-              keyExtractor={(item) => `${item.id}`}
-              scrollEnabled={false}
-              renderItem={({ item }) => (
+          {listed.length > 0 ? (
+            <ScrollView
+              style={styles.dropdownScroll}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
+            >
+              {listed.map((item) => (
                 <Pressable
-                  onPress={() => {
-                    onChange(item.name);
-                    setShowDropdown(false);
-                  }}
+                  key={item.id}
+                  onPress={() => select(item.name)}
                   style={({ pressed }) => [
                     styles.suggestion,
                     { borderBottomColor: colors.border, backgroundColor: pressed ? colors.surfaceAlt : 'transparent' },
@@ -106,12 +112,12 @@ export function LocationPickerField({
                     {item.name}
                   </Text>
                 </Pressable>
-              )}
-            />
+              ))}
+            </ScrollView>
           ) : (
             <View style={styles.noResults}>
               <Text style={[styles.noResultsText, { color: colors.textMuted }]}>
-                No matching locations
+                {isTyping ? 'No matching locations' : 'No saved locations yet'}
               </Text>
             </View>
           )}
@@ -144,19 +150,13 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     fontSize: FONT_SIZE.md,
   },
-  clearButton: {
-    position: 'absolute',
-    right: SPACING.lg + 4,
-    top: '50%',
-    marginTop: -10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dropdownIcon: {
+  trailingButton: {
     position: 'absolute',
     right: SPACING.md,
     top: '50%',
     marginTop: -10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dropdown: {
     position: 'absolute',
@@ -166,8 +166,11 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
     borderWidth: 1,
     borderRadius: RADIUS.md,
-    maxHeight: 200,
+    overflow: 'hidden',
     zIndex: 10,
+  },
+  dropdownScroll: {
+    maxHeight: 200,
   },
   suggestion: {
     paddingHorizontal: SPACING.md,

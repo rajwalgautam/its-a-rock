@@ -15,6 +15,7 @@ import { GradePicker } from '@/components/GradePicker';
 import { PhotoPickerField, type PhotoValue } from '@/components/PhotoPickerField';
 import { LocationPickerField } from '@/components/LocationPickerField';
 import { formatDate } from '@/utils/formatters';
+import { startOfDayMs } from '@/utils/dateUtils';
 import { validateRouteInput } from '@/utils/validators';
 import type { RouteInput, RouteWithGym } from '@/types';
 
@@ -112,7 +113,7 @@ export function RouteForm({
   function toggleCompleted(value: boolean): void {
     patch({
       completed: value,
-      completedAt: value ? (state.completedAt ?? Date.now()) : null,
+      completedAt: value ? (state.completedAt ?? startOfDayMs(Date.now())) : null,
     });
   }
 
@@ -313,7 +314,7 @@ function DatePickerModal({
             <Text style={[styles.pickerAction, { color: colors.primary }]}>Cancel</Text>
           </Pressable>
           <Text style={[styles.pickerTitle, { color: colors.textPrimary }]}>Select date</Text>
-          <Pressable onPress={() => onConfirm(tempDate.getTime())} hitSlop={8}>
+          <Pressable onPress={() => onConfirm(startOfDayMs(tempDate.getTime()))} hitSlop={8}>
             <Text style={[styles.pickerAction, { color: colors.primary, fontWeight: '700' }]}>Done</Text>
           </Pressable>
         </View>

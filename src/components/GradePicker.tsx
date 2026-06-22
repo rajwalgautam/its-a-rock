@@ -26,8 +26,16 @@ export function GradePicker({ value, onChange }: GradePickerProps): React.JSX.El
   const range = parseGradeRange(value);
   const [rangeMode, setRangeMode] = useState(range !== null);
 
-  const minStr = range !== null ? formatGrade(range.min.base, range.min.modifier) : (parseGrade(value) !== null ? value!.trim() : null);
-  const maxStr = range !== null ? formatGrade(range.max.base, range.max.modifier) : null;
+  // In range mode the endpoints are bare bases (e.g. "V4", "V5") — a range like
+  // "V4+ – V5-" isn't a real-world label, so the +/- modifiers are dropped.
+  const minStr = rangeMode
+    ? range !== null
+      ? range.min.base
+      : (parseGrade(value)?.base ?? null)
+    : parseGrade(value) !== null
+      ? value!.trim()
+      : null;
+  const maxStr = rangeMode && range !== null ? range.max.base : null;
 
   function emit(min: string | null, max: string | null): void {
     if (rangeMode && min !== null && max !== null) {
@@ -71,9 +79,9 @@ export function GradePicker({ value, onChange }: GradePickerProps): React.JSX.El
       ) : (
         <View style={styles.scaleGroup}>
           <Text style={[styles.scaleLabel, { color: colors.textMuted }]}>From</Text>
-          <GradeScale value={minStr} onChange={(g) => emit(g, maxStr)} />
+          <GradeScale value={minStr} onChange={(g) => emit(g, maxStr)} showModifiers={false} />
           <Text style={[styles.scaleLabel, { color: colors.textMuted }]}>To</Text>
-          <GradeScale value={maxStr} onChange={(g) => emit(minStr, g)} />
+          <GradeScale value={maxStr} onChange={(g) => emit(minStr, g)} showModifiers={false} />
         </View>
       )}
     </View>
@@ -83,10 +91,12 @@ export function GradePicker({ value, onChange }: GradePickerProps): React.JSX.El
 interface GradeScaleProps {
   value: string | null;
   onChange: (grade: string | null) => void;
+  /** Show the softer/even/harder modifier row. Hidden for range endpoints. */
+  showModifiers?: boolean;
 }
 
 /** V-scale base selector plus a -/+ modifier toggle for a single grade. */
-function GradeScale({ value, onChange }: GradeScaleProps): React.JSX.Element {
+function GradeScale({ value, onChange, showModifiers = true }: GradeScaleProps): React.JSX.Element {
   const { colors } = useTheme();
   const parsed = parseGrade(value);
   const selectedBase = parsed?.base ?? null;
@@ -140,6 +150,7 @@ function GradeScale({ value, onChange }: GradeScaleProps): React.JSX.Element {
         })}
       </ScrollView>
 
+      {showModifiers && (
       <View style={styles.modifierRow}>
         {GRADE_MODIFIERS.map((mod) => {
           const label = mod === '' ? 'even' : mod === '+' ? 'harder (+)' : 'softer (−)';
@@ -172,6 +183,7 @@ function GradeScale({ value, onChange }: GradeScaleProps): React.JSX.Element {
           );
         })}
       </View>
+      )}
     </View>
   );
 }

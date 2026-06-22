@@ -36,13 +36,26 @@ describe('validateRouteInput', () => {
     expect(reversed.errors.grade).toMatch(/start must be at or below/i);
   });
 
-  it('rejects a start date after the send date', () => {
-    const result = validateRouteInput(input({ startedAt: 2000, completedAt: 1000 }));
+  it('rejects a start day after the send day', () => {
+    const started = new Date(2026, 5, 22, 9, 0, 0).getTime();
+    const completed = new Date(2026, 5, 21, 9, 0, 0).getTime();
+    const result = validateRouteInput(input({ startedAt: started, completedAt: completed }));
     expect(result.valid).toBe(false);
     expect(result.errors.dates).toBeDefined();
   });
 
   it('accepts start before send', () => {
-    expect(validateRouteInput(input({ startedAt: 1000, completedAt: 2000 })).valid).toBe(true);
+    const started = new Date(2026, 5, 20, 9, 0, 0).getTime();
+    const completed = new Date(2026, 5, 22, 9, 0, 0).getTime();
+    expect(validateRouteInput(input({ startedAt: started, completedAt: completed })).valid).toBe(true);
+  });
+
+  it('accepts the same calendar day regardless of time of day', () => {
+    // Started later in the day than completed, but same day → must be valid.
+    const started = new Date(2026, 5, 21, 14, 30, 0).getTime();
+    const completed = new Date(2026, 5, 21, 9, 0, 0).getTime();
+    const result = validateRouteInput(input({ startedAt: started, completedAt: completed }));
+    expect(result.valid).toBe(true);
+    expect(result.errors.dates).toBeUndefined();
   });
 });
