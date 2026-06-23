@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
+import { useSettingsStore } from '@/store/useSettingsStore';
 import { GradePicker } from '@/components/GradePicker';
 import { MediaGalleryField } from '@/components/MediaGalleryField';
 import { LocationPickerField } from '@/components/LocationPickerField';
@@ -46,9 +47,10 @@ interface FormState {
 }
 
 function toState(initial?: RouteWithGym, initialMedia?: MediaItem[]): FormState {
+  const lastLocationName = useSettingsStore.getState().lastLocationName;
   return {
     name: initial?.name ?? '',
-    gymName: initial?.gym.name ?? '',
+    gymName: initial?.gym.name ?? (lastLocationName ?? ''),
     media:
       initial !== undefined
         ? initial.media.map((m) => ({ uri: m.uri, type: m.type, width: m.width, height: m.height }))
@@ -86,6 +88,7 @@ export function RouteForm({
 }: RouteFormProps): React.JSX.Element {
   const { colors } = useTheme();
   const headerHeight = useHeaderHeight();
+  const setLastLocationName = useSettingsStore((s) => s.setLastLocationName);
   const [state, setState] = useState<FormState>(() => toState(initial, initialMedia));
   const [errors, setErrors] = useState<ReturnType<typeof validateRouteInput>['errors']>({});
   const [saving, setSaving] = useState(false);
@@ -105,6 +108,10 @@ export function RouteForm({
     setErrors({});
     setSaving(true);
     try {
+      // Save the location as the last used one
+      if (state.gymName.length > 0) {
+        setLastLocationName(state.gymName);
+      }
       await onSubmit(input);
     } finally {
       setSaving(false);
@@ -383,7 +390,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: SPACING.lg,
-    paddingBottom: SPACING.lg,
+    paddingBottom: SPACING.xxl,
     flexGrow: 1,
   },
   form: {

@@ -36,6 +36,7 @@ export function RouteTile({ route, size, onPress, onLongPress }: RouteTileProps)
     return colors.success; // Green for active
   };
 
+  const hasVideo = route.media.some((m) => m.type === 'video');
   const displayDate = route.startedAt ?? route.completedAt;
 
   const handleLongPress = (): void => {
@@ -69,6 +70,12 @@ export function RouteTile({ route, size, onPress, onLongPress }: RouteTileProps)
       {route.completed && (
         <View style={[styles.sentBadge, { backgroundColor: colors.success }]}>
           <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+        </View>
+      )}
+
+      {hasVideo && (
+        <View style={[styles.videoBadge, { backgroundColor: colors.overlay }]}>
+          <Ionicons name="videocam" size={12} color={colors.onOverlay} />
         </View>
       )}
 
@@ -118,6 +125,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: SPACING.xs,
     right: SPACING.xs,
+    width: 24,
+    height: 24,
+    borderRadius: RADIUS.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoBadge: {
+    position: 'absolute',
+    top: SPACING.xs,
+    left: SPACING.xs,
     width: 24,
     height: 24,
     borderRadius: RADIUS.full,

@@ -41,7 +41,7 @@ export default function MyClimbing(): React.JSX.Element {
   const header = (
     <View style={styles.header}>
       <UpdateBanner />
-      <Text style={[styles.title, { color: colors.textPrimary }]}>This week</Text>
+      <Text style={[styles.title, { color: colors.textPrimary, fontSize: FONT_SIZE.xxl }]}>This week</Text>
       <View style={styles.statsRow}>
         <StatCard label="Visits" value={String(stats?.visits ?? 0)} />
         <StatCard label="Sends" value={String(stats?.completedThisWeek ?? 0)} accentColor={colors.success} />

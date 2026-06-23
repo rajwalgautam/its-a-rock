@@ -6,11 +6,13 @@ const SETTINGS_KEY = '@itsarock/settings';
 export interface Settings {
   themeMode: ThemeMode;
   columnDensity: ColumnDensity;
+  lastLocationName?: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   themeMode: 'system',
   columnDensity: 2,
+  lastLocationName: undefined,
 };
 
 const VALID_MODES: ThemeMode[] = ['light', 'dark', 'system'];
@@ -27,6 +29,7 @@ export async function loadSettings(): Promise<Settings> {
     columnDensity: VALID_DENSITIES.includes(parsed.columnDensity as ColumnDensity)
       ? (parsed.columnDensity as ColumnDensity)
       : DEFAULT_SETTINGS.columnDensity,
+    lastLocationName: parsed.lastLocationName ?? undefined,
   };
 }
 
