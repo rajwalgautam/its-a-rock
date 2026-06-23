@@ -44,7 +44,7 @@ export default function History(): React.JSX.Element {
   const header = (
     <View style={styles.header}>
       <View style={styles.titleRow}>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>All Climbs</Text>
+        <Text style={[styles.title, { color: colors.textPrimary, fontSize: FONT_SIZE.xxl }]}>All Climbs</Text>
         <ColumnDensityControl />
       </View>
       <HistoryFilterBar filters={filters} gyms={gyms} onChange={setFilters} />

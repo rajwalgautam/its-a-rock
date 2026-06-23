@@ -12,11 +12,13 @@ interface SettingsState extends Settings {
   load: () => Promise<void>;
   setThemeMode: (mode: ThemeMode) => void;
   setColumnDensity: (density: ColumnDensity) => void;
+  setLastLocationName: (name: string) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   themeMode: DEFAULT_SETTINGS.themeMode,
   columnDensity: DEFAULT_SETTINGS.columnDensity,
+  lastLocationName: DEFAULT_SETTINGS.lastLocationName,
   isLoaded: false,
 
   load: async () => {
@@ -33,9 +35,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ columnDensity: density });
     void persist(get);
   },
+
+  setLastLocationName: (name) => {
+    set({ lastLocationName: name });
+    void persist(get);
+  },
 }));
 
 function persist(get: () => SettingsState): Promise<void> {
-  const { themeMode, columnDensity } = get();
-  return saveSettings({ themeMode, columnDensity });
+  const { themeMode, columnDensity, lastLocationName } = get();
+  return saveSettings({ themeMode, columnDensity, lastLocationName });
 }

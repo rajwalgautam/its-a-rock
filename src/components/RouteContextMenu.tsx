@@ -85,24 +85,26 @@ export function RouteContextMenu({ visible, route, anchor, onDismiss, onEdit }: 
   if (showDeleteConfirm) {
     return (
       <Pressable style={styles.backdrop} onPress={() => setShowDeleteConfirm(false)}>
-        <View style={[styles.confirmDialog, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.confirmTitle, { color: colors.textPrimary }]}>Delete this climb?</Text>
-          <Text style={[styles.confirmMessage, { color: colors.textSecondary }]}>
-            This cannot be undone.
-          </Text>
-          <View style={styles.confirmButtonRow}>
-            <Pressable
-              style={[styles.confirmButton, { backgroundColor: colors.surfaceAlt }]}
-              onPress={() => setShowDeleteConfirm(false)}
-            >
-              <Text style={[styles.confirmButtonText, { color: colors.textPrimary }]}>Cancel</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.confirmButton, { backgroundColor: colors.danger }]}
-              onPress={handleConfirmDelete}
-            >
-              <Text style={[styles.confirmButtonText, { color: '#FFFFFF' }]}>Delete</Text>
-            </Pressable>
+        <View style={styles.centeredContainer}>
+          <View style={[styles.confirmDialog, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.confirmTitle, { color: colors.textPrimary }]}>Delete this climb?</Text>
+            <Text style={[styles.confirmMessage, { color: colors.textSecondary }]}>
+              This cannot be undone.
+            </Text>
+            <View style={styles.confirmButtonRow}>
+              <Pressable
+                style={[styles.confirmButton, { backgroundColor: colors.surfaceAlt }]}
+                onPress={() => setShowDeleteConfirm(false)}
+              >
+                <Text style={[styles.confirmButtonText, { color: colors.textPrimary }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.confirmButton, { backgroundColor: colors.danger }]}
+                onPress={handleConfirmDelete}
+              >
+                <Text style={[styles.confirmButtonText, { color: '#FFFFFF' }]}>Delete</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Pressable>
@@ -183,6 +185,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
+  centeredContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   menu: {
     position: 'absolute',
     borderRadius: RADIUS.lg,
@@ -212,7 +219,6 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     padding: SPACING.lg,
-    marginHorizontal: SPACING.lg,
     gap: SPACING.sm,
   },
   confirmTitle: {

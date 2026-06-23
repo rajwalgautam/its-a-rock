@@ -139,6 +139,7 @@ function VideoPage({
 }): React.JSX.Element {
   const player = useVideoPlayer(uri, (p) => {
     p.loop = false;
+    p.muted = true; // Mute videos by default
   });
 
   useEffect(() => {
