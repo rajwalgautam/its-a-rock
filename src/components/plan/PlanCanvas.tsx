@@ -1,7 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Image, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { LIMB_LABEL } from '@/constants/limbs';
 import { useTheme } from '@/theme/ThemeProvider';
 import { toNormalized, toScreen, type Point } from '@/utils/coords';
@@ -18,10 +23,14 @@ export interface CanvasMarker {
   color: string;
   /** Sequence badge (1-based), or null to hide it. */
   badge: number | null;
+  /** Render as a small numbered dot instead of a full labeled marker. */
+  dot?: boolean;
 }
 
-/** Radius (px) around a marker within which a tap selects rather than places. */
+/** Radius (image px) around a marker within which a tap selects rather than places. */
 const MARKER_GUARD = 24;
+/** How far in the user can pinch-zoom. */
+const MAX_SCALE = 4;
 
 interface PlanCanvasProps {
   photoUri: string;
@@ -63,6 +72,17 @@ export function PlanCanvas({
     [size.w, size.h, imgW, imgH],
   );
 
+  // Zoom/pan transform of the content layer. With `transformOrigin: top-left`
+  // the mapping is a plain affine — screen = translate + scale * local — so a
+  // touch inverts cleanly to image space: local = (screen - translate) / scale.
+  const scale = useSharedValue(1);
+  const tx = useSharedValue(0);
+  const ty = useSharedValue(0);
+  // Captured at pinch start so updates are relative to a stable baseline.
+  const startScale = useSharedValue(1);
+  const focalX = useSharedValue(0);
+  const focalY = useSharedValue(0);
+
   function onLayout(e: LayoutChangeEvent): void {
     const { width, height } = e.nativeEvent.layout;
     setSize({ w: width, h: height });
@@ -80,36 +100,95 @@ export function PlanCanvas({
     onPlace(toNormalized({ x: sx, y: sy }, layout));
   }
 
+  // Keep the scaled content covering the container so it can't be panned off.
+  function clampTranslate(s: number): void {
+    'worklet';
+    tx.value = Math.min(0, Math.max(size.w * (1 - s), tx.value));
+    ty.value = Math.min(0, Math.max(size.h * (1 - s), ty.value));
+  }
+
+  const pinch = Gesture.Pinch()
+    .onStart((e) => {
+      startScale.value = scale.value;
+      // Record the image-space point under the fingers so it stays put as we zoom.
+      focalX.value = (e.focalX - tx.value) / scale.value;
+      focalY.value = (e.focalY - ty.value) / scale.value;
+    })
+    .onUpdate((e) => {
+      const next = Math.min(MAX_SCALE, Math.max(1, startScale.value * e.scale));
+      scale.value = next;
+      tx.value = e.focalX - next * focalX.value;
+      ty.value = e.focalY - next * focalY.value;
+      clampTranslate(next);
+    });
+
+  // Two-finger drag pans; one finger stays free for placing/dragging markers.
+  const panCanvas = Gesture.Pan()
+    .minPointers(2)
+    .onChange((e) => {
+      tx.value += e.changeX;
+      ty.value += e.changeY;
+      clampTranslate(scale.value);
+    });
+
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .maxDistance(20)
+    .onEnd(() => {
+      scale.value = withTiming(1, { duration: 220 });
+      tx.value = withTiming(0, { duration: 220 });
+      ty.value = withTiming(0, { duration: 220 });
+    });
+
   // Recreated each render so it captures the current layout; harmless for taps.
   const tap = Gesture.Tap()
     .maxDistance(10)
     .enabled(editable && onPlace !== undefined)
     .onEnd((e) => {
-      runOnJS(place)(e.x, e.y);
+      // Invert the zoom transform: container point → image-space point.
+      runOnJS(place)((e.x - tx.value) / scale.value, (e.y - ty.value) / scale.value);
     });
+
+  const gesture = Gesture.Race(
+    Gesture.Simultaneous(pinch, panCanvas),
+    Gesture.Exclusive(doubleTap, tap),
+  );
+
+  const contentStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: tx.value },
+      { translateY: ty.value },
+      { scale: scale.value },
+    ],
+  }));
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]} onLayout={onLayout}>
-      <Image source={{ uri: photoUri }} style={StyleSheet.absoluteFill} resizeMode="contain" />
-      <GestureDetector gesture={tap}>
+      {/* Outer view stays untransformed so gesture coords are in container space. */}
+      <GestureDetector gesture={gesture}>
         <View style={StyleSheet.absoluteFill} collapsable={false}>
-          {layout.displayedW > 0 &&
-            markers.map((m) => (
-              <LimbMarker
-                key={m.key}
-                x={m.x}
-                y={m.y}
-                layout={layout}
-                color={m.color}
-                label={LIMB_LABEL[m.limb]}
-                badge={m.badge}
-                selected={m.key === selectedKey}
-                draggable={editable}
-                animated={animatedMarkers}
-                onSelect={() => onSelectMarker?.(m.key)}
-                onCommit={(norm) => onCommitMarker?.(m.key, norm)}
-              />
-            ))}
+          <Animated.View style={[StyleSheet.absoluteFill, styles.content, contentStyle]}>
+            <Image source={{ uri: photoUri }} style={StyleSheet.absoluteFill} resizeMode="contain" />
+            {layout.displayedW > 0 &&
+              markers.map((m) => (
+                <LimbMarker
+                  key={m.key}
+                  x={m.x}
+                  y={m.y}
+                  layout={layout}
+                  color={m.color}
+                  label={LIMB_LABEL[m.limb]}
+                  badge={m.badge}
+                  selected={m.key === selectedKey}
+                  draggable={editable}
+                  animated={animatedMarkers}
+                  compact={m.dot}
+                  scale={scale}
+                  onSelect={() => onSelectMarker?.(m.key)}
+                  onCommit={(norm) => onCommitMarker?.(m.key, norm)}
+                />
+              ))}
+          </Animated.View>
         </View>
       </GestureDetector>
     </View>
@@ -120,5 +199,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     overflow: 'hidden',
+  },
+  // Top-left origin makes the zoom transform a plain affine (see above).
+  content: {
+    transformOrigin: 'top left',
   },
 });
