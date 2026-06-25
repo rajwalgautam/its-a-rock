@@ -38,6 +38,11 @@ export interface Palette {
   tabBar: string;
   tabBarActive: string;
   tabBarInactive: string;
+  /** Route-planner limb markers. Distinct, accessible hues in both modes. */
+  limbLH: string;
+  limbRH: string;
+  limbLF: string;
+  limbRF: string;
 }
 
 export const LIGHT: Palette = {
@@ -60,6 +65,10 @@ export const LIGHT: Palette = {
   tabBar: '#FFFFFF',
   tabBarActive: '#EA580C',
   tabBarInactive: '#A8A29E',
+  limbLH: '#16A34A',
+  limbRH: '#2563EB',
+  limbLF: '#D97706',
+  limbRF: '#9333EA',
 };
 
 export const DARK: Palette = {
@@ -82,6 +91,10 @@ export const DARK: Palette = {
   tabBar: '#141416',
   tabBarActive: '#F97316',
   tabBarInactive: '#6B6660',
+  limbLH: '#22C55E',
+  limbRH: '#3B82F6',
+  limbLF: '#F59E0B',
+  limbRF: '#A855F7',
 };
 
 export const SPACING = {

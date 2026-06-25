@@ -97,6 +97,51 @@ export interface RouteFilters {
   gymId?: number;
 }
 
+// ---- Route planner ----
+
+/** A limb the climber places on the wall. */
+export type Limb = 'LH' | 'RH' | 'LF' | 'RF';
+
+/** A single placement in a plan: one limb to one spot, ordered by `sequence`. */
+export interface PlanMove {
+  readonly id: number;
+  planId: number;
+  limb: Limb;
+  /**
+   * Soft reference to a detected hold (`route_holds.id`) when snapped, or null
+   * when placed freehand. Stored without a FK so the planner has no dependency
+   * on the (later) detection tables.
+   */
+  holdId: number | null;
+  /** Normalized position in [0,1] relative to the photo's intrinsic pixels. */
+  x: number;
+  y: number;
+  /** 0-based, contiguous order within the plan. */
+  sequence: number;
+  createdAt: number;
+}
+
+/** A move to persist; id/sequence/createdAt are assigned by the query layer. */
+export interface PlanMoveInput {
+  limb: Limb;
+  holdId?: number | null;
+  x: number;
+  y: number;
+}
+
+/** An ordered sequence of moves drawn on one photo of a route. */
+export interface RoutePlan {
+  readonly id: number;
+  routeId: number;
+  /** The media item (photo) the plan is drawn on, or null if it was removed. */
+  mediaId: number | null;
+  name: string | null;
+  /** Moves in `sequence` order. */
+  moves: PlanMove[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 // ---- History tab filtering & sorting ----
 
 export type HistoryCompletion = 'all' | 'completed' | 'projects';

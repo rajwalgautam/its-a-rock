@@ -7,12 +7,15 @@ export interface Settings {
   themeMode: ThemeMode;
   columnDensity: ColumnDensity;
   lastLocationName?: string;
+  /** Offer to attach a send video when a climb is marked completed. */
+  promptSendVideo: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   themeMode: 'system',
   columnDensity: 2,
   lastLocationName: undefined,
+  promptSendVideo: true,
 };
 
 const VALID_MODES: ThemeMode[] = ['light', 'dark', 'system'];
@@ -30,6 +33,10 @@ export async function loadSettings(): Promise<Settings> {
       ? (parsed.columnDensity as ColumnDensity)
       : DEFAULT_SETTINGS.columnDensity,
     lastLocationName: parsed.lastLocationName ?? undefined,
+    promptSendVideo:
+      typeof parsed.promptSendVideo === 'boolean'
+        ? parsed.promptSendVideo
+        : DEFAULT_SETTINGS.promptSendVideo,
   };
 }
 

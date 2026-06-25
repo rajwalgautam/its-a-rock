@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Stack } from 'expo-router';
@@ -30,13 +31,15 @@ export default function RootLayout(): React.JSX.Element {
   }, [loadSettings, runStartupCheck]);
 
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <StatusBar style="auto" />
-        {ready ? <Navigator /> : <SplashFallback />}
-        {ready && <WhatsNewGate />}
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <StatusBar style="auto" />
+          {ready ? <Navigator /> : <SplashFallback />}
+          {ready && <WhatsNewGate />}
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
@@ -53,6 +56,7 @@ function Navigator(): React.JSX.Element {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="routes/new" options={{ title: 'Add a climb', presentation: 'modal' }} />
       <Stack.Screen name="routes/[id]" options={{ title: 'Climb' }} />
+      <Stack.Screen name="plan/[routeId]" options={{ title: 'Plan route' }} />
       <Stack.Screen name="releases" options={{ title: 'Release notes' }} />
     </Stack>
   );
