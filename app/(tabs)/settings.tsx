@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { FONT_SIZE, RADIUS, SHADOW, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
+import { useSettingsStore } from '@/store/useSettingsStore';
 import { LocationsManager } from '@/components/LocationsManager';
 import {
   downloadAndInstallApk,
@@ -24,6 +25,8 @@ const MODES: { mode: ThemeMode; label: string }[] = [
 
 export default function Settings(): React.JSX.Element {
   const { colors, mode, setMode } = useTheme();
+  const promptSendVideo = useSettingsStore((s) => s.promptSendVideo);
+  const setPromptSendVideo = useSettingsStore((s) => s.setPromptSendVideo);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [checking, setChecking] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
@@ -90,6 +93,26 @@ export default function Settings(): React.JSX.Element {
                 </Pressable>
               );
             })}
+          </View>
+        </View>
+
+        <SectionLabel label="Logging" />
+        <View style={[styles.card, { backgroundColor: colors.surface }, SHADOW.sm]}>
+          <View style={styles.row}>
+            <View style={styles.rowText}>
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+                Prompt for send video
+              </Text>
+              <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+                Offer to attach a video when you mark a climb completed
+              </Text>
+            </View>
+            <Switch
+              value={promptSendVideo}
+              onValueChange={setPromptSendVideo}
+              trackColor={{ false: colors.surfaceAlt, true: colors.primary }}
+              thumbColor={colors.surface}
+            />
           </View>
         </View>
 
@@ -182,9 +205,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: SPACING.sm,
   },
+  rowText: {
+    flex: 1,
+    marginRight: SPACING.md,
+  },
   rowLabel: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
+  },
+  rowHint: {
+    fontSize: FONT_SIZE.sm,
+    marginTop: 2,
   },
   rowValue: {
     fontSize: FONT_SIZE.md,

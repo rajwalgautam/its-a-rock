@@ -89,6 +89,7 @@ export function RouteForm({
   const { colors } = useTheme();
   const headerHeight = useHeaderHeight();
   const setLastLocationName = useSettingsStore((s) => s.setLastLocationName);
+  const promptSendVideo = useSettingsStore((s) => s.promptSendVideo);
   const [state, setState] = useState<FormState>(() => toState(initial, initialMedia));
   const [errors, setErrors] = useState<ReturnType<typeof validateRouteInput>['errors']>({});
   const [saving, setSaving] = useState(false);
@@ -125,7 +126,7 @@ export function RouteForm({
       completedAt: value ? (state.completedAt ?? startOfDayMs(Date.now())) : null,
     });
     // Celebrate a send and offer to attach a video straight away.
-    if (value) {
+    if (value && promptSendVideo) {
       confirmAddVideo(() => {
         void pickVideoFromLibrary().then((video) => {
           if (video !== null) {

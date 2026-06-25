@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { RouteForm } from '@/components/RouteForm';
@@ -18,6 +19,7 @@ interface RouteCardProps {
 /** Reusable detail card that flips between view and edit; edits persist to SQLite. */
 export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element {
   const { colors } = useTheme();
+  const router = useRouter();
   const editRoute = useRouteStore((s) => s.editRoute);
   const [editing, setEditing] = useState(false);
   const [current, setCurrent] = useState(route);
@@ -44,6 +46,7 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
 
   const media = current.media;
   const hasMedia = media.length > 0;
+  const hasPhoto = media.some((m) => m.type === 'photo');
   const coverUri = current.photoUri;
   const videoCount = media.filter((m) => m.type === 'video').length;
 
@@ -111,6 +114,18 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
       )}
       {current.notes !== null && current.notes.length > 0 && (
         <DetailRow icon="document-text-outline" value={current.notes} />
+      )}
+
+      {hasPhoto && (
+        <Pressable
+          onPress={() =>
+            router.push({ pathname: '/plan/[routeId]', params: { routeId: String(current.id) } })
+          }
+          style={[styles.editBtn, { borderColor: colors.border }]}
+        >
+          <Ionicons name="footsteps-outline" size={18} color={colors.primary} />
+          <Text style={[styles.editText, { color: colors.primary }]}>Plan route</Text>
+        </Pressable>
       )}
 
       <Pressable

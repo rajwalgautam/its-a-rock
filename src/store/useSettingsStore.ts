@@ -13,12 +13,14 @@ interface SettingsState extends Settings {
   setThemeMode: (mode: ThemeMode) => void;
   setColumnDensity: (density: ColumnDensity) => void;
   setLastLocationName: (name: string) => void;
+  setPromptSendVideo: (value: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   themeMode: DEFAULT_SETTINGS.themeMode,
   columnDensity: DEFAULT_SETTINGS.columnDensity,
   lastLocationName: DEFAULT_SETTINGS.lastLocationName,
+  promptSendVideo: DEFAULT_SETTINGS.promptSendVideo,
   isLoaded: false,
 
   load: async () => {
@@ -40,9 +42,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ lastLocationName: name });
     void persist(get);
   },
+
+  setPromptSendVideo: (value) => {
+    set({ promptSendVideo: value });
+    void persist(get);
+  },
 }));
 
 function persist(get: () => SettingsState): Promise<void> {
-  const { themeMode, columnDensity, lastLocationName } = get();
-  return saveSettings({ themeMode, columnDensity, lastLocationName });
+  const { themeMode, columnDensity, lastLocationName, promptSendVideo } = get();
+  return saveSettings({ themeMode, columnDensity, lastLocationName, promptSendVideo });
 }

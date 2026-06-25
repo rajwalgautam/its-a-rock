@@ -51,7 +51,7 @@ export async function initDatabase(): Promise<void> {
 }
 
 /** Latest schema version; bump and add a branch in runMigrations per change. */
-const LATEST_SCHEMA_VERSION = 1;
+const LATEST_SCHEMA_VERSION = 2;
 
 /**
  * Apply pending schema migrations, tracked by SQLite's `user_version`. Fresh
@@ -65,6 +65,11 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   if (version < 1) {
     await migrateToV1(db);
     version = 1;
+  }
+
+  if (version < 2) {
+    await migrateToV2(db);
+    version = 2;
   }
 
   if (version !== LATEST_SCHEMA_VERSION) version = LATEST_SCHEMA_VERSION;
@@ -99,4 +104,37 @@ async function migrateToV1(db: SQLite.SQLiteDatabase): Promise<void> {
          AND NOT EXISTS (SELECT 1 FROM route_media m WHERE m.route_id = routes.id)`,
     [Date.now()],
   );
+}
+
+/**
+ * v2: the route planner. `route_plans` is one ordered sequence of moves drawn on
+ * a photo; `plan_moves` is each placement (one limb to one spot). `hold_id` is a
+ * soft reference to the (later) `route_holds` table — intentionally no FK so the
+ * planner ships independently of hold detection.
+ */
+async function migrateToV2(db: SQLite.SQLiteDatabase): Promise<void> {
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS route_plans (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      route_id   INTEGER NOT NULL REFERENCES routes(id) ON DELETE CASCADE,
+      media_id   INTEGER REFERENCES route_media(id) ON DELETE SET NULL,
+      name       TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS plan_moves (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      plan_id    INTEGER NOT NULL REFERENCES route_plans(id) ON DELETE CASCADE,
+      limb       TEXT    NOT NULL,
+      hold_id    INTEGER,
+      x          REAL    NOT NULL,
+      y          REAL    NOT NULL,
+      sequence   INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_route_plans_route ON route_plans (route_id);
+    CREATE INDEX IF NOT EXISTS idx_plan_moves_plan   ON plan_moves (plan_id, sequence);
+  `);
 }

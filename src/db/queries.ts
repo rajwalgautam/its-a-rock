@@ -1,11 +1,21 @@
+import {
+  copyAsync,
+  documentDirectory,
+  getInfoAsync,
+  makeDirectoryAsync,
+} from 'expo-file-system/legacy';
 import { getDatabase } from './database';
 import { formatGymName, normalizeGymName } from '@/utils/gymUtils';
 import type {
   Gym,
+  Limb,
   MediaItem,
+  PlanMove,
+  PlanMoveInput,
   RouteFilters,
   RouteInput,
   RouteMedia,
+  RoutePlan,
   RouteWithGym,
 } from '@/types';
 
@@ -393,6 +403,181 @@ export async function getRoutesInRange(startMs: number, endMs: number): Promise<
     [startMs, endMs],
   );
   return rows.map(mapRoute);
+}
+
+// ---- Route planner (v1.2.0) ----
+
+interface RoutePlanRow {
+  id: number;
+  route_id: number;
+  media_id: number | null;
+  name: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+interface PlanMoveRow {
+  id: number;
+  plan_id: number;
+  limb: string;
+  hold_id: number | null;
+  x: number;
+  y: number;
+  sequence: number;
+  created_at: number;
+}
+
+const LIMBS: readonly Limb[] = ['LH', 'RH', 'LF', 'RF'];
+
+function mapLimb(raw: string): Limb {
+  return (LIMBS as readonly string[]).includes(raw) ? (raw as Limb) : 'LH';
+}
+
+function mapPlanMove(row: PlanMoveRow): PlanMove {
+  return {
+    id: row.id,
+    planId: row.plan_id,
+    limb: mapLimb(row.limb),
+    holdId: row.hold_id,
+    x: row.x,
+    y: row.y,
+    sequence: row.sequence,
+    createdAt: row.created_at,
+  };
+}
+
+function mapPlan(row: RoutePlanRow, moves: PlanMove[]): RoutePlan {
+  return {
+    id: row.id,
+    routeId: row.route_id,
+    mediaId: row.media_id,
+    name: row.name,
+    moves,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function getPlanMoves(planId: number): Promise<PlanMove[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<PlanMoveRow>(
+    'SELECT * FROM plan_moves WHERE plan_id = ? ORDER BY sequence ASC, id ASC',
+    [planId],
+  );
+  return rows.map(mapPlanMove);
+}
+
+export async function getPlanById(id: number): Promise<RoutePlan | null> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<RoutePlanRow>('SELECT * FROM route_plans WHERE id = ?', [id]);
+  if (row === null) return null;
+  return mapPlan(row, await getPlanMoves(id));
+}
+
+/** The route's plan (one per route for now), or null if none exists yet. */
+export async function getPlanForRoute(routeId: number): Promise<RoutePlan | null> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<RoutePlanRow>(
+    'SELECT * FROM route_plans WHERE route_id = ? ORDER BY id ASC LIMIT 1',
+    [routeId],
+  );
+  if (row === null) return null;
+  return mapPlan(row, await getPlanMoves(row.id));
+}
+
+export async function createPlan(
+  routeId: number,
+  mediaId: number | null,
+  name: string | null = null,
+): Promise<RoutePlan> {
+  const db = getDatabase();
+  const now = Date.now();
+  const result = await db.runAsync(
+    `INSERT INTO route_plans (route_id, media_id, name, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?)`,
+    [routeId, mediaId, name, now, now],
+  );
+  const plan = await getPlanById(result.lastInsertRowId);
+  if (plan === null) throw new Error('Plan not found after create');
+  return plan;
+}
+
+/** Get the route's plan, creating an empty one on the given photo if absent. */
+export async function getOrCreatePlanForRoute(
+  routeId: number,
+  mediaId: number | null,
+): Promise<RoutePlan> {
+  const existing = await getPlanForRoute(routeId);
+  if (existing !== null) return existing;
+  return createPlan(routeId, mediaId);
+}
+
+/**
+ * Replace a plan's moves with `moves`, renumbering `sequence` 0..n in array
+ * order, and bump the plan's `updated_at`. Returns the reloaded plan.
+ */
+export async function savePlanMoves(planId: number, moves: PlanMoveInput[]): Promise<RoutePlan> {
+  const db = getDatabase();
+  const now = Date.now();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM plan_moves WHERE plan_id = ?', [planId]);
+    for (let i = 0; i < moves.length; i++) {
+      const m = moves[i]!;
+      await db.runAsync(
+        `INSERT INTO plan_moves (plan_id, limb, hold_id, x, y, sequence, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [planId, m.limb, m.holdId ?? null, m.x, m.y, i, now],
+      );
+    }
+    await db.runAsync('UPDATE route_plans SET updated_at = ? WHERE id = ?', [now, planId]);
+  });
+  const plan = await getPlanById(planId);
+  if (plan === null) throw new Error('Plan not found after saving moves');
+  return plan;
+}
+
+export async function deletePlan(id: number): Promise<void> {
+  const db = getDatabase();
+  await db.runAsync('DELETE FROM route_plans WHERE id = ?', [id]);
+}
+
+/** Best-effort lowercase file extension from a URI, defaulting to `jpg`. */
+function fileExtension(uri: string): string {
+  const withoutQuery = uri.split('?')[0] ?? uri;
+  const match = /\.([a-zA-Z0-9]+)$/.exec(withoutQuery);
+  return match?.[1]?.toLowerCase() ?? 'jpg';
+}
+
+/**
+ * Copy a media item's file into app storage (`documentDirectory/plans`) so a
+ * plan anchored to it can't be orphaned by OS cache eviction, repointing the
+ * `route_media.uri` (and the cached cover on `routes`) to the durable copy.
+ * Idempotent: a file already under documentDirectory is left untouched. Returns
+ * the durable URI, or null when the media row is missing or has no usable file.
+ */
+export async function persistPlanPhoto(mediaId: number): Promise<string | null> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<{ uri: string }>('SELECT uri FROM route_media WHERE id = ?', [
+    mediaId,
+  ]);
+  const oldUri = row?.uri;
+  if (oldUri === undefined || oldUri.length === 0) return null;
+  if (documentDirectory === null) return oldUri;
+  if (oldUri.startsWith(documentDirectory)) return oldUri;
+
+  const dir = `${documentDirectory}plans/`;
+  const info = await getInfoAsync(dir);
+  if (!info.exists) {
+    await makeDirectoryAsync(dir, { intermediates: true });
+  }
+  const dest = `${dir}media-${mediaId}.${fileExtension(oldUri)}`;
+  await copyAsync({ from: oldUri, to: dest });
+
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('UPDATE route_media SET uri = ? WHERE id = ?', [dest, mediaId]);
+    await db.runAsync('UPDATE routes SET photo_uri = ? WHERE photo_uri = ?', [dest, oldUri]);
+  });
+  return dest;
 }
 
 export async function resetAllData(): Promise<void> {

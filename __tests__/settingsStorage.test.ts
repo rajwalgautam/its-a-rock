@@ -11,14 +11,18 @@ describe('settingsStorage', () => {
   });
 
   it('round-trips saved settings', async () => {
-    await saveSettings({ themeMode: 'dark', columnDensity: 4 });
-    expect(await loadSettings()).toEqual({ themeMode: 'dark', columnDensity: 4 });
+    await saveSettings({ themeMode: 'dark', columnDensity: 4, promptSendVideo: false });
+    expect(await loadSettings()).toEqual({
+      themeMode: 'dark',
+      columnDensity: 4,
+      promptSendVideo: false,
+    });
   });
 
   it('falls back to defaults for invalid stored values', async () => {
     await AsyncStorage.setItem(
       '@itsarock/settings',
-      JSON.stringify({ themeMode: 'neon', columnDensity: 9 }),
+      JSON.stringify({ themeMode: 'neon', columnDensity: 9, promptSendVideo: 'yes' }),
     );
     expect(await loadSettings()).toEqual(DEFAULT_SETTINGS);
   });
