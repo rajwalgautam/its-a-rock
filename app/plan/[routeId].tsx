@@ -229,6 +229,8 @@ export default function RoutePlanScreen(): React.JSX.Element {
       badge: null,
     }));
   } else {
+    // Collapse every move except the latest (or the one being edited) to a
+    // numbered dot, so earlier markers stop covering the holds underneath.
     markers = moves.map((m, i) => ({
       key: m.key,
       limb: m.limb,
@@ -236,6 +238,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
       y: m.y,
       color: limbColor(colors, m.limb),
       badge: i + 1,
+      dot: i !== moves.length - 1 && m.key !== selectedKey,
     }));
   }
 

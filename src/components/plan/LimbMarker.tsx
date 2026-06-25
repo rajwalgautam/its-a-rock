@@ -6,6 +6,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 import { FONT_SIZE } from '@/constants/theme';
 import { toNormalized, toScreen, type Point } from '@/utils/coords';
@@ -14,6 +15,8 @@ import type { ImageRect } from '@/utils/imageLayout';
 /** 44dp touch target (a11y minimum) with a smaller visible dot centered in it. */
 const TOUCH = 44;
 const DOT = 30;
+/** Collapsed marker: a small numbered dot that barely covers the hold. */
+const DOT_SM = 18;
 
 interface LimbMarkerProps {
   /** Normalized position in [0,1] relative to the photo. */
@@ -28,6 +31,13 @@ interface LimbMarkerProps {
   draggable?: boolean;
   /** Glide to new positions (used in playback); instant otherwise. */
   animated?: boolean;
+  /** Collapse to a small numbered dot so the hold underneath stays visible. */
+  compact?: boolean;
+  /**
+   * Live canvas zoom factor. Drag deltas arrive in screen pixels, so they are
+   * divided by this to move the marker the right amount in image space.
+   */
+  scale?: SharedValue<number>;
   onSelect?: () => void;
   /** Called with the new normalized position when a drag ends. */
   onCommit?: (norm: Point) => void;
@@ -50,6 +60,8 @@ export function LimbMarker({
   selected = false,
   draggable = false,
   animated = false,
+  compact = false,
+  scale,
   onSelect,
   onCommit,
 }: LimbMarkerProps): React.JSX.Element {
@@ -78,8 +90,9 @@ export function LimbMarker({
   const pan = Gesture.Pan()
     .enabled(draggable)
     .onChange((e) => {
-      posX.value += e.changeX;
-      posY.value += e.changeY;
+      const s = scale ? scale.value : 1;
+      posX.value += e.changeX / s;
+      posY.value += e.changeY / s;
     })
     .onEnd(() => {
       runOnJS(commit)(posX.value, posY.value);
@@ -103,18 +116,31 @@ export function LimbMarker({
         accessibilityRole="button"
         accessibilityLabel={`${label} marker`}
       >
-        <Animated.View
-          style={[
-            styles.dot,
-            { backgroundColor: color, borderWidth: selected ? 3 : 1.5 },
-          ]}
-        >
-          <Text style={styles.label}>{label}</Text>
-        </Animated.View>
-        {badge !== null && (
-          <Animated.View style={[styles.badge, { borderColor: color }]}>
-            <Text style={[styles.badgeText, { color }]}>{badge}</Text>
+        {compact ? (
+          <Animated.View
+            style={[
+              styles.dotSm,
+              { backgroundColor: color, borderWidth: selected ? 2.5 : 1.5 },
+            ]}
+          >
+            {badge !== null && <Text style={styles.dotSmText}>{badge}</Text>}
           </Animated.View>
+        ) : (
+          <>
+            <Animated.View
+              style={[
+                styles.dot,
+                { backgroundColor: color, borderWidth: selected ? 3 : 1.5 },
+              ]}
+            >
+              <Text style={styles.label}>{label}</Text>
+            </Animated.View>
+            {badge !== null && (
+              <Animated.View style={[styles.badge, { borderColor: color }]}>
+                <Text style={[styles.badgeText, { color }]}>{badge}</Text>
+              </Animated.View>
+            )}
+          </>
         )}
       </Animated.View>
     </GestureDetector>
@@ -136,6 +162,19 @@ const styles = StyleSheet.create({
     borderColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  dotSm: {
+    width: DOT_SM,
+    height: DOT_SM,
+    borderRadius: DOT_SM / 2,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dotSmText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
   },
   label: {
     color: '#FFFFFF',
