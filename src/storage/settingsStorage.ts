@@ -1,4 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  DEFAULT_BUBBLE_SCALE,
+  MAX_BUBBLE_SCALE,
+  MIN_BUBBLE_SCALE,
+} from '@/constants/plan';
 import type { ColumnDensity, ThemeMode } from '@/types';
 
 const SETTINGS_KEY = '@itsarock/settings';
@@ -11,6 +16,8 @@ export interface Settings {
   promptSendVideo: boolean;
   /** Start videos muted when opened in the viewer. */
   muteVideosByDefault: boolean;
+  /** Size multiplier for the route planner's limb bubbles on the photo. */
+  bubbleScale: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -19,10 +26,20 @@ export const DEFAULT_SETTINGS: Settings = {
   lastLocationName: undefined,
   promptSendVideo: true,
   muteVideosByDefault: true,
+  bubbleScale: DEFAULT_BUBBLE_SCALE,
 };
 
 const VALID_MODES: ThemeMode[] = ['light', 'dark', 'system'];
 const VALID_DENSITIES: ColumnDensity[] = [1, 2, 3, 4];
+
+function validBubbleScale(value: unknown): number {
+  return typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= MIN_BUBBLE_SCALE &&
+    value <= MAX_BUBBLE_SCALE
+    ? value
+    : DEFAULT_SETTINGS.bubbleScale;
+}
 
 export async function loadSettings(): Promise<Settings> {
   const raw = await AsyncStorage.getItem(SETTINGS_KEY);
@@ -44,6 +61,7 @@ export async function loadSettings(): Promise<Settings> {
       typeof parsed.muteVideosByDefault === 'boolean'
         ? parsed.muteVideosByDefault
         : DEFAULT_SETTINGS.muteVideosByDefault,
+    bubbleScale: validBubbleScale(parsed.bubbleScale),
   };
 }
 
