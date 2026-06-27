@@ -115,6 +115,11 @@ export function PlanCanvas({
       focalY.value = (e.focalY - ty.value) / scale.value;
     })
     .onUpdate((e) => {
+      // As a finger lifts to end the pinch, the reported focal point collapses
+      // from the two-finger midpoint to the remaining finger. Translation is
+      // derived from that focal, so honoring this update would snap the image.
+      // Freeze on the last good two-finger frame instead.
+      if (e.numberOfPointers < 2) return;
       const next = Math.min(MAX_SCALE, Math.max(1, startScale.value * e.scale));
       scale.value = next;
       tx.value = e.focalX - next * focalX.value;
