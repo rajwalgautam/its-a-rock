@@ -182,4 +182,4 @@ export interface WeeklyStats {
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 /** Tiles per row in the route grid. */
-export type ColumnDensity = 2 | 3 | 4;
+export type ColumnDensity = 1 | 2 | 3 | 4;
