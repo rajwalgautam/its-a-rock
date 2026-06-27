@@ -20,12 +20,17 @@ import { LimbSelector } from '@/components/plan/LimbSelector';
 import { MoveList } from '@/components/plan/MoveList';
 import { PlaybackControls } from '@/components/plan/PlaybackControls';
 import {
+  addToFrame,
   appendMove,
+  frameStanceAt,
+  framesOf,
   fromPlan,
-  limbStanceAt,
-  movingLimbAt,
+  groupMoves,
+  movingLimbsAt,
+  nextGroupId,
+  removeFromFrame,
   removeMove,
-  reorderMoves,
+  reorderFrames,
   toInputs,
   updateMovePosition,
   type DraftMove,
@@ -83,6 +88,8 @@ export default function RoutePlanScreen(): React.JSX.Element {
   const [moves, setMoves] = useState<DraftMove[]>([]);
   const [activeLimb, setActiveLimb] = useState<Limb>('LH');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // When grouping is on, every placement joins `groupId`; off means solo moves.
+  const [groupId, setGroupId] = useState<number | null>(null);
   const [listOpen, setListOpen] = useState(false);
   const [mode, setMode] = useState<'edit' | 'play'>('edit');
   const [step, setStep] = useState(0);
@@ -167,6 +174,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
       x: norm.x,
       y: norm.y,
       holdId: null,
+      groupId,
     };
     void commitMoves(appendMove(movesRef.current, move));
   }
@@ -175,14 +183,34 @@ export default function RoutePlanScreen(): React.JSX.Element {
     void commitMoves(updateMovePosition(movesRef.current, key, norm.x, norm.y));
   }
 
+  /** Toggle grouping; turning it on allocates a fresh frame id for placements. */
+  function toggleGrouping(): void {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setGroupId((g) => (g !== null ? null : nextGroupId(movesRef.current)));
+  }
+
   function handleReorder(from: number, to: number): void {
-    void commitMoves(reorderMoves(movesRef.current, from, to));
+    void commitMoves(reorderFrames(movesRef.current, from, to));
   }
 
   function handleRemove(key: string): void {
     if (selectedKey === key) setSelectedKey(null);
     void commitMoves(removeMove(movesRef.current, key));
   }
+
+  function handleGroupFromList(keys: string[]): void {
+    void commitMoves(groupMoves(movesRef.current, keys));
+  }
+
+  function handleAddToFrame(key: string, frameGroupId: number): void {
+    void commitMoves(addToFrame(movesRef.current, key, frameGroupId));
+  }
+
+  function handleRemoveFromFrame(key: string): void {
+    void commitMoves(removeFromFrame(movesRef.current, key));
+  }
+
+  const frames = framesOf(moves);
 
   function enterPlay(): void {
     if (moves.length === 0) return;
@@ -192,7 +220,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
   }
 
   function setPlayStep(next: number): void {
-    setStep(Math.max(0, Math.min(next, moves.length)));
+    setStep(Math.max(0, Math.min(next, frames.length)));
   }
 
   if (state.status !== 'ready') {
@@ -214,12 +242,14 @@ export default function RoutePlanScreen(): React.JSX.Element {
   }
 
   const playing = mode === 'play';
-  const safeStep = Math.min(step, moves.length);
-  const movingLimb = playing ? movingLimbAt(moves, safeStep) : null;
+  const grouping = groupId !== null;
+  const safeStep = Math.min(step, frames.length);
+  const movingLimbs = playing ? movingLimbsAt(moves, safeStep) : [];
 
   let markers: CanvasMarker[];
   if (playing) {
-    const stance = limbStanceAt(moves, safeStep);
+    const stance = frameStanceAt(moves, safeStep);
+    const moving = new Set(movingLimbs);
     markers = LIMB_ORDER.filter((l) => stance[l] !== null).map((l) => ({
       key: `play-${l}`,
       limb: l,
@@ -227,6 +257,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
       y: stance[l]!.y,
       color: limbColor(colors, l),
       badge: null,
+      highlighted: moving.has(l),
     }));
   } else {
     // Collapse every move except the latest (or the one being edited) to a
@@ -239,6 +270,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
       color: limbColor(colors, m.limb),
       badge: i + 1,
       dot: i !== moves.length - 1 && m.key !== selectedKey,
+      groupId: m.groupId,
     }));
   }
 
@@ -252,21 +284,39 @@ export default function RoutePlanScreen(): React.JSX.Element {
           markers={markers}
           editable={!playing}
           animatedMarkers={playing}
-          selectedKey={playing ? (movingLimb !== null ? `play-${movingLimb}` : null) : selectedKey}
+          selectedKey={playing ? null : selectedKey}
           onPlace={handlePlace}
           onSelectMarker={setSelectedKey}
           onCommitMarker={handleCommitMarker}
         />
-        {!playing && moves.length === 0 && (
+        {!playing && (moves.length === 0 || grouping) && (
           <View style={styles.hint} pointerEvents="none">
             <Text style={[styles.hintText, { color: colors.onOverlay, backgroundColor: colors.overlay }]}>
-              Pick a limb below, then tap the wall to place it.
+              {grouping
+                ? 'Grouping on — limbs you place now move together.'
+                : 'Pick a limb below, then tap the wall to place it.'}
             </Text>
           </View>
         )}
 
         {!playing && (
           <View style={styles.toolbar}>
+            <Pressable
+              onPress={toggleGrouping}
+              style={[
+                styles.toolBtn,
+                { backgroundColor: grouping ? colors.primary : colors.overlay },
+              ]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: grouping }}
+              accessibilityLabel={grouping ? 'Grouping on' : 'Group moves'}
+            >
+              <Ionicons
+                name="git-merge"
+                size={20}
+                color={grouping ? colors.onPrimary : colors.onOverlay}
+              />
+            </Pressable>
             <Pressable
               onPress={() => setListOpen(true)}
               style={[styles.toolBtn, { backgroundColor: colors.overlay }]}
@@ -295,8 +345,8 @@ export default function RoutePlanScreen(): React.JSX.Element {
       {playing ? (
         <PlaybackControls
           step={safeStep}
-          total={moves.length}
-          movingLimb={movingLimb}
+          total={frames.length}
+          movingLimbs={movingLimbs}
           onStep={setPlayStep}
           onExit={() => setMode('edit')}
         />
@@ -312,6 +362,9 @@ export default function RoutePlanScreen(): React.JSX.Element {
         onSelect={setSelectedKey}
         onReorder={handleReorder}
         onRemove={handleRemove}
+        onGroup={handleGroupFromList}
+        onAddToFrame={handleAddToFrame}
+        onRemoveFromFrame={handleRemoveFromFrame}
       />
     </View>
   );

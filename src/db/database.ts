@@ -51,7 +51,7 @@ export async function initDatabase(): Promise<void> {
 }
 
 /** Latest schema version; bump and add a branch in runMigrations per change. */
-const LATEST_SCHEMA_VERSION = 2;
+const LATEST_SCHEMA_VERSION = 3;
 
 /**
  * Apply pending schema migrations, tracked by SQLite's `user_version`. Fresh
@@ -70,6 +70,11 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   if (version < 2) {
     await migrateToV2(db);
     version = 2;
+  }
+
+  if (version < 3) {
+    await migrateToV3(db);
+    version = 3;
   }
 
   if (version !== LATEST_SCHEMA_VERSION) version = LATEST_SCHEMA_VERSION;
@@ -137,4 +142,17 @@ async function migrateToV2(db: SQLite.SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_route_plans_route ON route_plans (route_id);
     CREATE INDEX IF NOT EXISTS idx_plan_moves_plan   ON plan_moves (plan_id, sequence);
   `);
+}
+
+/**
+ * v3: grouped frames. A nullable `group_id` on `plan_moves` lets several
+ * placements share one frame (limbs that move simultaneously); a null id is a
+ * solo move (the pre-v3 behaviour). No FK — ids are only unique within a plan.
+ * `ADD COLUMN` isn't idempotent, so guard on the existing columns.
+ */
+async function migrateToV3(db: SQLite.SQLiteDatabase): Promise<void> {
+  const cols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(plan_moves)');
+  if (!cols.some((c) => c.name === 'group_id')) {
+    await db.execAsync('ALTER TABLE plan_moves ADD COLUMN group_id INTEGER');
+  }
 }
