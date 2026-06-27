@@ -46,7 +46,7 @@ export function PlaybackControls({
         {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          paddingBottom: Math.max(insets.bottom, SPACING.sm),
+          paddingBottom: insets.bottom + SPACING.lg,
         },
       ]}
     >

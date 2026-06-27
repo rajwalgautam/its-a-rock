@@ -2,21 +2,20 @@ import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
-  Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
+import { FONT_SIZE, SPACING } from '@/constants/theme';
 import { LIMB_ORDER, limbColor } from '@/constants/limbs';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useRouteStore } from '@/store/useRouteStore';
 import { usePlanStore } from '@/store/usePlanStore';
+import { useSettingsStore } from '@/store/useSettingsStore';
 import { PlanCanvas, type CanvasMarker } from '@/components/plan/PlanCanvas';
-import { LimbSelector } from '@/components/plan/LimbSelector';
+import { PlanEditBar } from '@/components/plan/PlanEditBar';
 import { MoveList } from '@/components/plan/MoveList';
 import { PlaybackControls } from '@/components/plan/PlaybackControls';
 import {
@@ -83,6 +82,8 @@ export default function RoutePlanScreen(): React.JSX.Element {
   const getRoute = useRouteStore((s) => s.getRoute);
   const loadPlan = usePlanStore((s) => s.loadPlan);
   const saveMoves = usePlanStore((s) => s.saveMoves);
+  const bubbleScale = useSettingsStore((s) => s.bubbleScale);
+  const setBubbleScale = useSettingsStore((s) => s.setBubbleScale);
 
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [moves, setMoves] = useState<DraftMove[]>([]);
@@ -284,6 +285,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
           markers={markers}
           editable={!playing}
           animatedMarkers={playing}
+          bubbleScale={bubbleScale}
           selectedKey={playing ? null : selectedKey}
           onPlace={handlePlace}
           onSelectMarker={setSelectedKey}
@@ -298,48 +300,6 @@ export default function RoutePlanScreen(): React.JSX.Element {
             </Text>
           </View>
         )}
-
-        {!playing && (
-          <View style={styles.toolbar}>
-            <Pressable
-              onPress={toggleGrouping}
-              style={[
-                styles.toolBtn,
-                { backgroundColor: grouping ? colors.primary : colors.overlay },
-              ]}
-              accessibilityRole="button"
-              accessibilityState={{ selected: grouping }}
-              accessibilityLabel={grouping ? 'Grouping on' : 'Group moves'}
-            >
-              <Ionicons
-                name="git-merge"
-                size={20}
-                color={grouping ? colors.onPrimary : colors.onOverlay}
-              />
-            </Pressable>
-            <Pressable
-              onPress={() => setListOpen(true)}
-              style={[styles.toolBtn, { backgroundColor: colors.overlay }]}
-              accessibilityLabel="Show move sequence"
-            >
-              <Ionicons name="list" size={20} color={colors.onOverlay} />
-              {moves.length > 0 && (
-                <Text style={[styles.toolBtnBadge, { color: colors.onOverlay }]}>{moves.length}</Text>
-              )}
-            </Pressable>
-            <Pressable
-              onPress={enterPlay}
-              disabled={moves.length === 0}
-              style={[
-                styles.toolBtn,
-                { backgroundColor: colors.overlay, opacity: moves.length === 0 ? 0.4 : 1 },
-              ]}
-              accessibilityLabel="Play route"
-            >
-              <Ionicons name="play" size={20} color={colors.onOverlay} />
-            </Pressable>
-          </View>
-        )}
       </View>
 
       {playing ? (
@@ -351,7 +311,18 @@ export default function RoutePlanScreen(): React.JSX.Element {
           onExit={() => setMode('edit')}
         />
       ) : (
-        <LimbSelector active={activeLimb} onChange={setActiveLimb} />
+        <PlanEditBar
+          activeLimb={activeLimb}
+          onLimbChange={setActiveLimb}
+          grouping={grouping}
+          onToggleGroup={toggleGrouping}
+          onPlay={enterPlay}
+          playDisabled={moves.length === 0}
+          moveCount={moves.length}
+          onOpenList={() => setListOpen(true)}
+          bubbleScale={bubbleScale}
+          onBubbleScaleChange={setBubbleScale}
+        />
       )}
 
       <MoveList
@@ -400,26 +371,5 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     borderRadius: 999,
     overflow: 'hidden',
-  },
-  toolbar: {
-    position: 'absolute',
-    top: SPACING.md,
-    right: SPACING.md,
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  toolBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-    minWidth: 44,
-    height: 44,
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.full,
-    justifyContent: 'center',
-  },
-  toolBtnBadge: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '800',
   },
 });

@@ -15,6 +15,7 @@ interface SettingsState extends Settings {
   setLastLocationName: (name: string) => void;
   setPromptSendVideo: (value: boolean) => void;
   setMuteVideosByDefault: (value: boolean) => void;
+  setBubbleScale: (value: number) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -23,6 +24,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   lastLocationName: DEFAULT_SETTINGS.lastLocationName,
   promptSendVideo: DEFAULT_SETTINGS.promptSendVideo,
   muteVideosByDefault: DEFAULT_SETTINGS.muteVideosByDefault,
+  bubbleScale: DEFAULT_SETTINGS.bubbleScale,
   isLoaded: false,
 
   load: async () => {
@@ -54,15 +56,28 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ muteVideosByDefault: value });
     void persist(get);
   },
+
+  setBubbleScale: (value) => {
+    set({ bubbleScale: value });
+    void persist(get);
+  },
 }));
 
 function persist(get: () => SettingsState): Promise<void> {
-  const { themeMode, columnDensity, lastLocationName, promptSendVideo, muteVideosByDefault } = get();
+  const {
+    themeMode,
+    columnDensity,
+    lastLocationName,
+    promptSendVideo,
+    muteVideosByDefault,
+    bubbleScale,
+  } = get();
   return saveSettings({
     themeMode,
     columnDensity,
     lastLocationName,
     promptSendVideo,
     muteVideosByDefault,
+    bubbleScale,
   });
 }

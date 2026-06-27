@@ -46,6 +46,8 @@ interface PlanCanvasProps {
   editable: boolean;
   /** When true, markers glide to new positions (playback). */
   animatedMarkers?: boolean;
+  /** Size multiplier for the limb bubbles (user-configurable). */
+  bubbleScale?: number;
   selectedKey?: string | null;
   onPlace?: (norm: Point) => void;
   onSelectMarker?: (key: string) => void;
@@ -64,6 +66,7 @@ export function PlanCanvas({
   markers,
   editable,
   animatedMarkers = false,
+  bubbleScale = 1,
   selectedKey = null,
   onPlace,
   onSelectMarker,
@@ -203,6 +206,7 @@ export function PlanCanvas({
                   draggable={editable}
                   animated={animatedMarkers}
                   compact={m.dot}
+                  bubbleScale={bubbleScale}
                   scale={scale}
                   onSelect={() => onSelectMarker?.(m.key)}
                   onCommit={(norm) => onCommitMarker?.(m.key, norm)}

@@ -1,7 +1,7 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
-import { LIMB_LABEL, LIMB_NAME, LIMB_ORDER, limbColor } from '@/constants/limbs';
+import { LIMB_ICON, LIMB_ICON_FLIP, LIMB_NAME, LIMB_ORDER, limbColor } from '@/constants/limbs';
 import { useTheme } from '@/theme/ThemeProvider';
 import type { Limb } from '@/types';
 
@@ -10,22 +10,12 @@ interface LimbSelectorProps {
   onChange: (limb: Limb) => void;
 }
 
-/** Pinned bottom bar to choose which limb the next tap/placement controls. */
+/** Row of limb buttons (hand/foot icons) choosing which limb the next tap places. */
 export function LimbSelector({ active, onChange }: LimbSelectorProps): React.JSX.Element {
   const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
 
   return (
-    <View
-      style={[
-        styles.bar,
-        {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          paddingBottom: Math.max(insets.bottom, SPACING.sm),
-        },
-      ]}
-    >
+    <View style={styles.row}>
       {LIMB_ORDER.map((limb) => {
         const color = limbColor(colors, limb);
         const isActive = limb === active;
@@ -44,9 +34,12 @@ export function LimbSelector({ active, onChange }: LimbSelectorProps): React.JSX
                 { borderColor: color, backgroundColor: isActive ? color : 'transparent' },
               ]}
             >
-              <Text style={[styles.code, { color: isActive ? '#FFFFFF' : color }]}>
-                {LIMB_LABEL[limb]}
-              </Text>
+              <MaterialCommunityIcons
+                name={LIMB_ICON[limb]}
+                size={24}
+                color={isActive ? '#FFFFFF' : color}
+                style={LIMB_ICON_FLIP[limb] ? styles.flip : undefined}
+              />
             </View>
             <Text
               style={[styles.name, { color: isActive ? colors.textPrimary : colors.textMuted }]}
@@ -62,11 +55,8 @@ export function LimbSelector({ active, onChange }: LimbSelectorProps): React.JSX
 }
 
 const styles = StyleSheet.create({
-  bar: {
+  row: {
     flexDirection: 'row',
-    paddingTop: SPACING.sm,
-    paddingHorizontal: SPACING.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
   item: {
     flex: 1,
@@ -75,16 +65,15 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
   },
   chip: {
-    width: 44,
-    height: 32,
+    width: 52,
+    height: 36,
     borderRadius: RADIUS.full,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  code: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '800',
+  flip: {
+    transform: [{ scaleX: -1 }],
   },
   name: {
     fontSize: FONT_SIZE.xs,

@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
-import { FONT_SIZE } from '@/constants/theme';
+import { FONT_SIZE, SPACING } from '@/constants/theme';
 import { toNormalized, toScreen, type Point } from '@/utils/coords';
 import type { ImageRect } from '@/utils/imageLayout';
 
@@ -33,6 +33,8 @@ interface LimbMarkerProps {
   animated?: boolean;
   /** Collapse to a small numbered dot so the hold underneath stays visible. */
   compact?: boolean;
+  /** Size multiplier for the visible dot (user-configurable bubble size). */
+  bubbleScale?: number;
   /**
    * Live canvas zoom factor. Drag deltas arrive in screen pixels, so they are
    * divided by this to move the marker the right amount in image space.
@@ -61,10 +63,18 @@ export function LimbMarker({
   draggable = false,
   animated = false,
   compact = false,
+  bubbleScale = 1,
   scale,
   onSelect,
   onCommit,
 }: LimbMarkerProps): React.JSX.Element {
+  // Dot grows with the user's bubble-size preference; the touch box keeps the
+  // 44dp a11y minimum but expands to wrap a dot larger than that.
+  const dotSize = (compact ? DOT_SM : DOT) * bubbleScale;
+  const touchSize = Math.max(TOUCH, dotSize + SPACING.sm);
+  const labelSize = Math.max(8, Math.round(FONT_SIZE.xs * bubbleScale));
+  const dotSmTextSize = Math.max(7, Math.round(9 * bubbleScale));
+
   const screen = toScreen({ x, y }, layout);
   const posX = useSharedValue(screen.x);
   const posY = useSharedValue(screen.y);
@@ -105,14 +115,14 @@ export function LimbMarker({
   const gesture = Gesture.Race(pan, tap);
 
   const style = useAnimatedStyle(() => ({
-    left: posX.value - TOUCH / 2,
-    top: posY.value - TOUCH / 2,
+    left: posX.value - touchSize / 2,
+    top: posY.value - touchSize / 2,
   }));
 
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View
-        style={[styles.touch, style]}
+        style={[styles.touch, { width: touchSize, height: touchSize }, style]}
         accessibilityRole="button"
         accessibilityLabel={`${label} marker`}
       >
@@ -120,20 +130,34 @@ export function LimbMarker({
           <Animated.View
             style={[
               styles.dotSm,
-              { backgroundColor: color, borderWidth: selected ? 2.5 : 1.5 },
+              {
+                width: dotSize,
+                height: dotSize,
+                borderRadius: dotSize / 2,
+                backgroundColor: color,
+                borderWidth: selected ? 2.5 : 1.5,
+              },
             ]}
           >
-            {badge !== null && <Text style={styles.dotSmText}>{badge}</Text>}
+            {badge !== null && (
+              <Text style={[styles.dotSmText, { fontSize: dotSmTextSize }]}>{badge}</Text>
+            )}
           </Animated.View>
         ) : (
           <>
             <Animated.View
               style={[
                 styles.dot,
-                { backgroundColor: color, borderWidth: selected ? 3 : 1.5 },
+                {
+                  width: dotSize,
+                  height: dotSize,
+                  borderRadius: dotSize / 2,
+                  backgroundColor: color,
+                  borderWidth: selected ? 3 : 1.5,
+                },
               ]}
             >
-              <Text style={styles.label}>{label}</Text>
+              <Text style={[styles.label, { fontSize: labelSize }]}>{label}</Text>
             </Animated.View>
             {badge !== null && (
               <Animated.View style={[styles.badge, { borderColor: color }]}>
@@ -148,37 +172,29 @@ export function LimbMarker({
 }
 
 const styles = StyleSheet.create({
+  // Width/height/borderRadius are applied inline so the dot can scale with the
+  // user's bubble-size preference.
   touch: {
     position: 'absolute',
-    width: TOUCH,
-    height: TOUCH,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dot: {
-    width: DOT,
-    height: DOT,
-    borderRadius: DOT / 2,
     borderColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   dotSm: {
-    width: DOT_SM,
-    height: DOT_SM,
-    borderRadius: DOT_SM / 2,
     borderColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   dotSmText: {
     color: '#FFFFFF',
-    fontSize: 9,
     fontWeight: '800',
   },
   label: {
     color: '#FFFFFF',
-    fontSize: FONT_SIZE.xs,
     fontWeight: '800',
   },
   badge: {
