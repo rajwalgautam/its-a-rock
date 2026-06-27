@@ -116,6 +116,11 @@ export interface PlanMove {
   /** Normalized position in [0,1] relative to the photo's intrinsic pixels. */
   x: number;
   y: number;
+  /**
+   * Frame id: moves sharing the same non-null `groupId` move simultaneously
+   * (one frame). Null is a solo move. Ids are only unique within a plan.
+   */
+  groupId: number | null;
   /** 0-based, contiguous order within the plan. */
   sequence: number;
   createdAt: number;
@@ -127,6 +132,7 @@ export interface PlanMoveInput {
   holdId?: number | null;
   x: number;
   y: number;
+  groupId?: number | null;
 }
 
 /** An ordered sequence of moves drawn on one photo of a route. */

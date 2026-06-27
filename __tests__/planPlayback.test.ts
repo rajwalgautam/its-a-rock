@@ -1,8 +1,14 @@
-import { limbStanceAt, movingLimbAt, type DraftMove } from '@/utils/planSequence';
+import {
+  frameStanceAt,
+  limbStanceAt,
+  movingLimbAt,
+  movingLimbsAt,
+  type DraftMove,
+} from '@/utils/planSequence';
 import type { Limb } from '@/types';
 
-function move(limb: Limb, x: number, y: number): DraftMove {
-  return { key: `${limb}-${x}-${y}`, limb, x, y, holdId: null };
+function move(limb: Limb, x: number, y: number, groupId: number | null = null): DraftMove {
+  return { key: `${limb}-${x}-${y}`, limb, x, y, holdId: null, groupId };
 }
 
 // LH→RH→LF→RF, then LH moves again to a new hold.
@@ -63,5 +69,48 @@ describe('movingLimbAt', () => {
 
   it('returns null past the end', () => {
     expect(movingLimbAt(moves, 6)).toBeNull();
+  });
+});
+
+// LH solo, then LF+RF together (one frame), then RH solo: 3 frames.
+const framed: DraftMove[] = [
+  move('LH', 0.1, 0.1),
+  move('LF', 0.3, 0.3, 9),
+  move('RF', 0.4, 0.4, 9),
+  move('RH', 0.2, 0.2),
+];
+
+describe('frameStanceAt', () => {
+  it('advances a whole frame per step', () => {
+    expect(frameStanceAt(framed, 1)).toEqual({
+      LH: { x: 0.1, y: 0.1 },
+      RH: null,
+      LF: null,
+      RF: null,
+    });
+    // After frame 2 both feet have landed together.
+    expect(frameStanceAt(framed, 2)).toEqual({
+      LH: { x: 0.1, y: 0.1 },
+      RH: null,
+      LF: { x: 0.3, y: 0.3 },
+      RF: { x: 0.4, y: 0.4 },
+    });
+  });
+
+  it('clamps beyond the frame count', () => {
+    expect(frameStanceAt(framed, 99)).toEqual(frameStanceAt(framed, 3));
+  });
+});
+
+describe('movingLimbsAt', () => {
+  it('returns every limb in the frame', () => {
+    expect(movingLimbsAt(framed, 1)).toEqual(['LH']);
+    expect(movingLimbsAt(framed, 2)).toEqual(['LF', 'RF']);
+    expect(movingLimbsAt(framed, 3)).toEqual(['RH']);
+  });
+
+  it('returns [] at the start and past the end', () => {
+    expect(movingLimbsAt(framed, 0)).toEqual([]);
+    expect(movingLimbsAt(framed, 4)).toEqual([]);
   });
 });

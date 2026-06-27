@@ -25,6 +25,10 @@ export interface CanvasMarker {
   badge: number | null;
   /** Render as a small numbered dot instead of a full labeled marker. */
   dot?: boolean;
+  /** Frame id; markers sharing one are joined by a dotted connector. */
+  groupId?: number | null;
+  /** Force the selected (emphasized) styling regardless of `selectedKey`. */
+  highlighted?: boolean;
 }
 
 /** Radius (image px) around a marker within which a tap selects rather than places. */
@@ -175,6 +179,15 @@ export function PlanCanvas({
           <Animated.View style={[StyleSheet.absoluteFill, styles.content, contentStyle]}>
             <Image source={{ uri: photoUri }} style={StyleSheet.absoluteFill} resizeMode="contain" />
             {layout.displayedW > 0 &&
+              frameConnectors(markers).map((seg) => (
+                <Connector
+                  key={seg.key}
+                  a={toScreen({ x: seg.ax, y: seg.ay }, layout)}
+                  b={toScreen({ x: seg.bx, y: seg.by }, layout)}
+                  color={colors.onOverlay}
+                />
+              ))}
+            {layout.displayedW > 0 &&
               markers.map((m) => (
                 <LimbMarker
                   key={m.key}
@@ -184,7 +197,7 @@ export function PlanCanvas({
                   color={m.color}
                   label={LIMB_LABEL[m.limb]}
                   badge={m.badge}
-                  selected={m.key === selectedKey}
+                  selected={m.key === selectedKey || m.highlighted === true}
                   draggable={editable}
                   animated={animatedMarkers}
                   compact={m.dot}
@@ -200,10 +213,57 @@ export function PlanCanvas({
   );
 }
 
+interface ConnectorSegment {
+  key: string;
+  ax: number;
+  ay: number;
+  bx: number;
+  by: number;
+}
+
+/** Line segments joining consecutive markers that share a non-null `groupId`. */
+function frameConnectors(markers: CanvasMarker[]): ConnectorSegment[] {
+  const segments: ConnectorSegment[] = [];
+  for (let i = 1; i < markers.length; i++) {
+    const a = markers[i - 1]!;
+    const b = markers[i]!;
+    if (a.groupId != null && a.groupId === b.groupId) {
+      segments.push({ key: `${a.key}-${b.key}`, ax: a.x, ay: a.y, bx: b.x, by: b.y });
+    }
+  }
+  return segments;
+}
+
+/** A dotted line between two screen points, drawn as evenly-spaced dots. */
+function Connector({ a, b, color }: { a: Point; b: Point; color: string }): React.JSX.Element {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const count = Math.max(2, Math.round(Math.hypot(dx, dy) / 12));
+  const dots = [];
+  for (let i = 0; i <= count; i++) {
+    const t = i / count;
+    dots.push(
+      <View
+        key={i}
+        pointerEvents="none"
+        style={[styles.connDot, { left: a.x + dx * t - 2, top: a.y + dy * t - 2, backgroundColor: color }]}
+      />,
+    );
+  }
+  return <>{dots}</>;
+}
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
     overflow: 'hidden',
+  },
+  connDot: {
+    position: 'absolute',
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    opacity: 0.85,
   },
   // Top-left origin makes the zoom transform a plain affine (see above).
   content: {

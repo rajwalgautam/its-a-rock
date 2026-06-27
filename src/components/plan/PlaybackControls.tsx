@@ -14,8 +14,10 @@ const THUMB = 16;
 interface PlaybackControlsProps {
   /** Current step in [0, total]; 0 is the start (nothing placed). */
   step: number;
+  /** Total number of frames. */
   total: number;
-  movingLimb: Limb | null;
+  /** Limbs that move on this step (one for a solo move, several for a frame). */
+  movingLimbs: Limb[];
   onStep: (step: number) => void;
   onExit: () => void;
 }
@@ -24,17 +26,18 @@ interface PlaybackControlsProps {
 export function PlaybackControls({
   step,
   total,
-  movingLimb,
+  movingLimbs,
   onStep,
   onExit,
 }: PlaybackControlsProps): React.JSX.Element {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
+  const limbsLabel = movingLimbs.map((l) => LIMB_NAME[l]).join(' + ');
   const caption =
     step === 0
       ? 'Start'
-      : `Move ${step} of ${total}${movingLimb !== null ? ` — ${LIMB_NAME[movingLimb]}` : ''}`;
+      : `Move ${step} of ${total}${limbsLabel !== '' ? ` — ${limbsLabel}` : ''}`;
 
   return (
     <View

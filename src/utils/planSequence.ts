@@ -14,6 +14,11 @@ export interface DraftMove {
   x: number;
   y: number;
   holdId: number | null;
+  /**
+   * Frame id: moves sharing the same non-null `groupId` move together (one
+   * frame). Null is a solo move.
+   */
+  groupId: number | null;
 }
 
 /** Build editable moves from a persisted plan (keys are the row ids). */
@@ -24,16 +29,32 @@ export function fromPlan(plan: RoutePlan): DraftMove[] {
     x: m.x,
     y: m.y,
     holdId: m.holdId,
+    groupId: m.groupId,
   }));
 }
 
 /** Strip editor-only fields for persistence; array order becomes `sequence`. */
 export function toInputs(moves: DraftMove[]): PlanMoveInput[] {
-  return moves.map((m) => ({ limb: m.limb, x: m.x, y: m.y, holdId: m.holdId }));
+  return moves.map((m) => ({
+    limb: m.limb,
+    x: m.x,
+    y: m.y,
+    holdId: m.holdId,
+    groupId: m.groupId,
+  }));
 }
 
 export function appendMove(moves: DraftMove[], move: DraftMove): DraftMove[] {
   return [...moves, move];
+}
+
+/** Next group id for a plan: one past the largest in use (ids are per-plan). */
+export function nextGroupId(moves: DraftMove[]): number {
+  let max = 0;
+  for (const m of moves) {
+    if (m.groupId !== null && m.groupId > max) max = m.groupId;
+  }
+  return max + 1;
 }
 
 /** Update a single move's position by key (used by drag-to-adjust). */
@@ -57,9 +78,114 @@ export function reorderMoves(moves: DraftMove[], from: number, to: number): Draf
   return next;
 }
 
-/** Remove a move by key. */
+/** Remove a move by key, dissolving its frame if only one member is left. */
 export function removeMove(moves: DraftMove[], key: string): DraftMove[] {
-  return moves.filter((m) => m.key !== key);
+  const target = moves.find((m) => m.key === key);
+  const next = moves.filter((m) => m.key !== key);
+  if (target?.groupId != null) {
+    const remaining = next.filter((m) => m.groupId === target.groupId);
+    if (remaining.length <= 1) {
+      return next.map((m) =>
+        m.groupId === target.groupId ? { ...m, groupId: null } : m,
+      );
+    }
+  }
+  return next;
+}
+
+// ---- Frames (grouped, simultaneous moves) ----
+
+/**
+ * Partition moves into frames. A frame is a maximal run of adjacent moves
+ * sharing the same non-null `groupId`; every solo (null) move is its own frame.
+ */
+export function framesOf(moves: DraftMove[]): DraftMove[][] {
+  const frames: DraftMove[][] = [];
+  for (const m of moves) {
+    const last = frames[frames.length - 1];
+    const prev = last?.[last.length - 1];
+    if (last !== undefined && prev !== undefined && m.groupId !== null && prev.groupId === m.groupId) {
+      last.push(m);
+    } else {
+      frames.push([m]);
+    }
+  }
+  return frames;
+}
+
+/** Reorder whole frames (by frame index), keeping each frame's members together. */
+export function reorderFrames(moves: DraftMove[], from: number, to: number): DraftMove[] {
+  const frames = framesOf(moves);
+  if (from < 0 || from >= frames.length || to < 0 || to >= frames.length || from === to) {
+    return moves;
+  }
+  const next = [...frames];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item!);
+  return next.flat();
+}
+
+/**
+ * Add the move `key` to the frame `groupId`, placing it right after the frame's
+ * last member so the frame stays contiguous. No-op if the target frame is empty
+ * or already contains the move's limb (a frame holds distinct limbs).
+ */
+export function addToFrame(moves: DraftMove[], key: string, groupId: number): DraftMove[] {
+  const moving = moves.find((m) => m.key === key);
+  const target = moves.filter((m) => m.groupId === groupId);
+  if (moving === undefined || target.length === 0) return moves;
+  if (target.some((m) => m.limb === moving.limb)) return moves;
+
+  const without = moves.filter((m) => m.key !== key);
+  const anchorKey = target[target.length - 1]!.key;
+  const idx = without.findIndex((m) => m.key === anchorKey);
+  const updated = { ...moving, groupId };
+  return [...without.slice(0, idx + 1), updated, ...without.slice(idx + 1)];
+}
+
+/**
+ * Remove the move `key` from its frame, making it solo. It is re-inserted right
+ * after the frame's last remaining member so the rest stays contiguous; a frame
+ * left with one member dissolves to solo too.
+ */
+export function removeFromFrame(moves: DraftMove[], key: string): DraftMove[] {
+  const moving = moves.find((m) => m.key === key);
+  if (moving === undefined || moving.groupId === null) return moves;
+  const gid = moving.groupId;
+  const remaining = moves.filter((m) => m.groupId === gid && m.key !== key);
+  if (remaining.length === 0) {
+    return moves.map((m) => (m.key === key ? { ...m, groupId: null } : m));
+  }
+
+  const without = moves.filter((m) => m.key !== key);
+  const anchorKey = remaining[remaining.length - 1]!.key;
+  const dissolve = remaining.length <= 1;
+  const next = dissolve
+    ? without.map((m) => (m.groupId === gid ? { ...m, groupId: null } : m))
+    : without;
+  const idx = next.findIndex((m) => m.key === anchorKey);
+  const updated = { ...moving, groupId: null };
+  return [...next.slice(0, idx + 1), updated, ...next.slice(idx + 1)];
+}
+
+/**
+ * Promote two or more moves (by key) into a new frame, gathered contiguously at
+ * the position of the earliest one. No-op unless at least two distinct-limbed
+ * moves are selected (a frame holds distinct limbs).
+ */
+export function groupMoves(moves: DraftMove[], keys: string[]): DraftMove[] {
+  const keySet = new Set(keys);
+  const selected = moves.filter((m) => keySet.has(m.key));
+  if (selected.length < 2) return moves;
+  const limbs = selected.map((m) => m.limb);
+  if (new Set(limbs).size !== limbs.length) return moves;
+
+  const gid = nextGroupId(moves);
+  const grouped = selected.map((m) => ({ ...m, groupId: gid }));
+  const firstIdx = moves.findIndex((m) => keySet.has(m.key));
+  const before = moves.slice(0, firstIdx).filter((m) => !keySet.has(m.key));
+  const after = moves.slice(firstIdx).filter((m) => !keySet.has(m.key));
+  return [...before, ...grouped, ...after];
 }
 
 // ---- Playback (derived state, nothing extra stored) ----
@@ -85,4 +211,28 @@ export function limbStanceAt(moves: DraftMove[], step: number): LimbStance {
 export function movingLimbAt(moves: DraftMove[], step: number): Limb | null {
   if (step <= 0 || step > moves.length) return null;
   return moves[step - 1]!.limb;
+}
+
+/**
+ * The stance after the first `frameStep` frames (clamped to [0, frame count]).
+ * Like `limbStanceAt` but a step advances a whole frame, so grouped limbs land
+ * together.
+ */
+export function frameStanceAt(moves: DraftMove[], frameStep: number): LimbStance {
+  const frames = framesOf(moves);
+  const clamped = Math.max(0, Math.min(frameStep, frames.length));
+  const stance: LimbStance = { LH: null, RH: null, LF: null, RF: null };
+  for (let i = 0; i < clamped; i++) {
+    for (const m of frames[i]!) {
+      stance[m.limb] = { x: m.x, y: m.y };
+    }
+  }
+  return stance;
+}
+
+/** The limbs that move to reach frame `frameStep` (1-based), or [] at the start. */
+export function movingLimbsAt(moves: DraftMove[], frameStep: number): Limb[] {
+  const frames = framesOf(moves);
+  if (frameStep <= 0 || frameStep > frames.length) return [];
+  return frames[frameStep - 1]!.map((m) => m.limb);
 }

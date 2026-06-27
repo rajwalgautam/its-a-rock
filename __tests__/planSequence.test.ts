@@ -1,6 +1,12 @@
 import {
+  addToFrame,
   appendMove,
+  framesOf,
+  groupMoves,
+  nextGroupId,
+  removeFromFrame,
   removeMove,
+  reorderFrames,
   reorderMoves,
   toInputs,
   updateMovePosition,
@@ -8,11 +14,12 @@ import {
 } from '@/utils/planSequence';
 import type { Limb } from '@/types';
 
-function move(key: string, limb: Limb = 'LH'): DraftMove {
-  return { key, limb, x: 0.5, y: 0.5, holdId: null };
+function move(key: string, limb: Limb = 'LH', groupId: number | null = null): DraftMove {
+  return { key, limb, x: 0.5, y: 0.5, holdId: null, groupId };
 }
 
 const keys = (moves: DraftMove[]): string[] => moves.map((m) => m.key);
+const groupIds = (moves: DraftMove[]): (number | null)[] => moves.map((m) => m.groupId);
 
 describe('reorderMoves', () => {
   const base = [move('a'), move('b'), move('c'), move('d')];
@@ -63,13 +70,108 @@ describe('updateMovePosition', () => {
 
 describe('toInputs', () => {
   it('strips editor keys and preserves order + fields', () => {
-    const moves = [
-      { key: 'a', limb: 'RH' as Limb, x: 0.2, y: 0.3, holdId: 7 },
-      { key: 'b', limb: 'LF' as Limb, x: 0.8, y: 0.9, holdId: null },
+    const moves: DraftMove[] = [
+      { key: 'a', limb: 'RH', x: 0.2, y: 0.3, holdId: 7, groupId: 1 },
+      { key: 'b', limb: 'LF', x: 0.8, y: 0.9, holdId: null, groupId: null },
     ];
     expect(toInputs(moves)).toEqual([
-      { limb: 'RH', x: 0.2, y: 0.3, holdId: 7 },
-      { limb: 'LF', x: 0.8, y: 0.9, holdId: null },
+      { limb: 'RH', x: 0.2, y: 0.3, holdId: 7, groupId: 1 },
+      { limb: 'LF', x: 0.8, y: 0.9, holdId: null, groupId: null },
     ]);
+  });
+});
+
+describe('nextGroupId', () => {
+  it('starts at 1 with no groups', () => {
+    expect(nextGroupId([move('a'), move('b')])).toBe(1);
+  });
+
+  it('is one past the largest group id in use', () => {
+    expect(nextGroupId([move('a', 'LH', 2), move('b', 'RH', 5), move('c')])).toBe(6);
+  });
+});
+
+describe('framesOf', () => {
+  it('treats solo moves as singleton frames', () => {
+    expect(framesOf([move('a'), move('b')]).map(keys)).toEqual([['a'], ['b']]);
+  });
+
+  it('groups adjacent moves sharing a non-null group id', () => {
+    const moves = [move('a'), move('b', 'LF', 7), move('c', 'RF', 7), move('d')];
+    expect(framesOf(moves).map(keys)).toEqual([['a'], ['b', 'c'], ['d']]);
+  });
+});
+
+describe('reorderFrames', () => {
+  // a | (b,c) | d  ->  frames [a] [b,c] [d]
+  const base = [move('a'), move('b', 'LF', 7), move('c', 'RF', 7), move('d')];
+
+  it('moves a whole frame, keeping members together', () => {
+    expect(keys(reorderFrames(base, 1, 0))).toEqual(['b', 'c', 'a', 'd']);
+  });
+
+  it('is a no-op for out-of-range or equal indices', () => {
+    expect(reorderFrames(base, 0, 0)).toBe(base);
+    expect(reorderFrames(base, 0, 9)).toBe(base);
+  });
+});
+
+describe('removeMove', () => {
+  it('dissolves a frame left with a single member', () => {
+    const moves = [move('a', 'LF', 7), move('b', 'RF', 7), move('c')];
+    const next = removeMove(moves, 'b');
+    expect(keys(next)).toEqual(['a', 'c']);
+    expect(groupIds(next)).toEqual([null, null]);
+  });
+
+  it('keeps a frame grouped when 2+ members remain', () => {
+    const moves = [move('a', 'LH', 7), move('b', 'LF', 7), move('c', 'RF', 7)];
+    const next = removeMove(moves, 'a');
+    expect(groupIds(next)).toEqual([7, 7]);
+  });
+});
+
+describe('addToFrame', () => {
+  it('adds a solo move to a frame, placed after its last member', () => {
+    const moves = [move('a', 'LF', 7), move('b', 'RF', 7), move('c', 'LH')];
+    const next = addToFrame(moves, 'c', 7);
+    expect(keys(next)).toEqual(['a', 'b', 'c']);
+    expect(groupIds(next)).toEqual([7, 7, 7]);
+  });
+
+  it('rejects when the frame already holds the limb', () => {
+    const moves = [move('a', 'LF', 7), move('b', 'RF', 7), move('c', 'LF')];
+    expect(addToFrame(moves, 'c', 7)).toBe(moves);
+  });
+});
+
+describe('removeFromFrame', () => {
+  it('ungroups a member and dissolves a 2-member frame', () => {
+    const moves = [move('a', 'LF', 7), move('b', 'RF', 7)];
+    expect(groupIds(removeFromFrame(moves, 'a'))).toEqual([null, null]);
+  });
+
+  it('keeps the frame grouped when 2+ members remain', () => {
+    const moves = [move('a', 'LH', 7), move('b', 'LF', 7), move('c', 'RF', 7)];
+    const next = removeFromFrame(moves, 'a');
+    expect(framesOf(next).map(keys)).toEqual([['b', 'c'], ['a']]);
+    expect(next.find((m) => m.key === 'a')!.groupId).toBeNull();
+  });
+});
+
+describe('groupMoves', () => {
+  it('promotes two solo moves into a new frame', () => {
+    const moves = [move('a', 'LF'), move('b', 'RF')];
+    const next = groupMoves(moves, ['a', 'b']);
+    expect(groupIds(next)).toEqual([1, 1]);
+  });
+
+  it('rejects duplicate limbs and singletons', () => {
+    expect(groupMoves([move('a', 'LF'), move('b', 'LF')], ['a', 'b'])).toEqual([
+      move('a', 'LF'),
+      move('b', 'LF'),
+    ]);
+    const single = [move('a')];
+    expect(groupMoves(single, ['a'])).toBe(single);
   });
 });
