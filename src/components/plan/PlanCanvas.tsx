@@ -114,20 +114,22 @@ export function PlanCanvas({
   const pinch = Gesture.Pinch()
     .onStart((e) => {
       startScale.value = scale.value;
-      // Record the image-space point under the fingers so it stays put as we zoom.
+      // Record the image-space point under the fingers *once*. The zoom stays
+      // anchored to this captured point rather than the live focal: as a finger
+      // lifts to end the pinch, the reported focal collapses from the two-finger
+      // midpoint to the remaining finger, and following it would snap the image.
       focalX.value = (e.focalX - tx.value) / scale.value;
       focalY.value = (e.focalY - ty.value) / scale.value;
     })
     .onUpdate((e) => {
-      // As a finger lifts to end the pinch, the reported focal point collapses
-      // from the two-finger midpoint to the remaining finger. Translation is
-      // derived from that focal, so honoring this update would snap the image.
-      // Freeze on the last good two-finger frame instead.
-      if (e.numberOfPointers < 2) return;
       const next = Math.min(MAX_SCALE, Math.max(1, startScale.value * e.scale));
+      // Keep the captured focal point fixed on screen as the scale changes, by
+      // adjusting translation by the scale delta. This is incremental (+=) so it
+      // composes with the simultaneous two-finger pan below instead of stomping
+      // it — and it never reads the live focal, so finger lifts can't jump it.
+      tx.value += (scale.value - next) * focalX.value;
+      ty.value += (scale.value - next) * focalY.value;
       scale.value = next;
-      tx.value = e.focalX - next * focalX.value;
-      ty.value = e.focalY - next * focalY.value;
       clampTranslate(next);
     });
 
