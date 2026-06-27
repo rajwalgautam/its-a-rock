@@ -15,7 +15,19 @@ interface MarkdownProps {
  */
 export function Markdown({ source }: MarkdownProps): React.JSX.Element {
   const { colors } = useTheme();
-  const lines = source.replace(/\r\n/g, '\n').split('\n');
+  // Trim surrounding whitespace and collapse runs of blank lines so multiple
+  // consecutive newlines render as a single paragraph break, not stacked gaps.
+  const lines = source
+    .replace(/\r\n/g, '\n')
+    .trim()
+    .split('\n')
+    .reduce<string[]>((acc, line) => {
+      const isBlank = line.trim().length === 0;
+      const prevBlank = acc.length > 0 && acc[acc.length - 1].trim().length === 0;
+      if (isBlank && prevBlank) return acc;
+      acc.push(line);
+      return acc;
+    }, []);
 
   return (
     <View style={styles.container}>

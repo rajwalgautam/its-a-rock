@@ -9,6 +9,8 @@ export interface Settings {
   lastLocationName?: string;
   /** Offer to attach a send video when a climb is marked completed. */
   promptSendVideo: boolean;
+  /** Start videos muted when opened in the viewer. */
+  muteVideosByDefault: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -16,10 +18,11 @@ export const DEFAULT_SETTINGS: Settings = {
   columnDensity: 2,
   lastLocationName: undefined,
   promptSendVideo: true,
+  muteVideosByDefault: true,
 };
 
 const VALID_MODES: ThemeMode[] = ['light', 'dark', 'system'];
-const VALID_DENSITIES: ColumnDensity[] = [2, 3, 4];
+const VALID_DENSITIES: ColumnDensity[] = [1, 2, 3, 4];
 
 export async function loadSettings(): Promise<Settings> {
   const raw = await AsyncStorage.getItem(SETTINGS_KEY);
@@ -37,6 +40,10 @@ export async function loadSettings(): Promise<Settings> {
       typeof parsed.promptSendVideo === 'boolean'
         ? parsed.promptSendVideo
         : DEFAULT_SETTINGS.promptSendVideo,
+    muteVideosByDefault:
+      typeof parsed.muteVideosByDefault === 'boolean'
+        ? parsed.muteVideosByDefault
+        : DEFAULT_SETTINGS.muteVideosByDefault,
   };
 }
 

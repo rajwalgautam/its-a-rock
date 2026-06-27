@@ -10,6 +10,7 @@ import { useUpdateStore } from '@/store/useUpdateStore';
 import { cleanupPendingApk } from '@/utils/updateChecker';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 import { WhatsNewGate } from '@/components/WhatsNewGate';
+import { ConfirmModalHost } from '@/components/ConfirmModalHost';
 
 export default function RootLayout(): React.JSX.Element {
   const [ready, setReady] = useState(false);
@@ -37,6 +38,7 @@ export default function RootLayout(): React.JSX.Element {
           <StatusBar style="auto" />
           {ready ? <Navigator /> : <SplashFallback />}
           {ready && <WhatsNewGate />}
+          <ConfirmModalHost />
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -140,7 +142,11 @@ function GymFormModal({
   return (
     <Modal visible={isOpen} transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable style={styles.backdrop} onPress={onCancel} />
-      <View style={styles.modalCenter} pointerEvents="box-none">
+      <KeyboardAvoidingView
+        style={styles.modalCenter}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        pointerEvents="box-none"
+      >
         <View style={[styles.dialog, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.dialogTitle, { color: colors.textPrimary }]}>
             {gym === 'new' ? 'Add location' : 'Rename location'}
@@ -154,6 +160,8 @@ function GymFormModal({
             placeholder="Movement Englewood"
             placeholderTextColor={colors.textMuted}
             autoFocus
+            returnKeyType="done"
+            onSubmitEditing={() => void handleSubmit()}
             style={[styles.input, { backgroundColor: colors.surfaceAlt, borderColor: error !== null ? colors.danger : colors.border, color: colors.textPrimary }]}
           />
           {error !== null && <Text style={[styles.error, { color: colors.danger }]}>{error}</Text>}
@@ -172,7 +180,7 @@ function GymFormModal({
             </Pressable>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

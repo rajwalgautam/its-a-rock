@@ -1,6 +1,7 @@
 import { Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { assetToMediaItem } from './mediaUtils';
+import { useConfirmStore } from '@/store/useConfirmStore';
 import type { MediaItem } from '@/types';
 
 /** Pick a single video from the library, handling permissions. */
@@ -20,12 +21,20 @@ export async function pickVideoFromLibrary(): Promise<MediaItem | null> {
 }
 
 /**
- * Celebrate a send and offer to attach a video. Calls `onYes` when the user
- * opts in (which should immediately open the video picker).
+ * Celebrate a send and offer to attach a video via the themed confirm dialog.
+ * Calls `onYes` when the user opts in (which should immediately open the video
+ * picker).
  */
 export function confirmAddVideo(onYes: () => void): void {
-  Alert.alert('Nice send! 🎉', 'Want to add a video of your send?', [
-    { text: 'Not now', style: 'cancel' },
-    { text: 'Add video', onPress: onYes },
-  ]);
+  void useConfirmStore
+    .getState()
+    .confirm({
+      title: 'Nice send! 🎉',
+      message: 'Want to add a video of your send?',
+      confirmLabel: 'Add video',
+      cancelLabel: 'Not now',
+    })
+    .then((confirmed) => {
+      if (confirmed) onYes();
+    });
 }

@@ -14,6 +14,7 @@ interface SettingsState extends Settings {
   setColumnDensity: (density: ColumnDensity) => void;
   setLastLocationName: (name: string) => void;
   setPromptSendVideo: (value: boolean) => void;
+  setMuteVideosByDefault: (value: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -21,6 +22,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   columnDensity: DEFAULT_SETTINGS.columnDensity,
   lastLocationName: DEFAULT_SETTINGS.lastLocationName,
   promptSendVideo: DEFAULT_SETTINGS.promptSendVideo,
+  muteVideosByDefault: DEFAULT_SETTINGS.muteVideosByDefault,
   isLoaded: false,
 
   load: async () => {
@@ -47,9 +49,20 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ promptSendVideo: value });
     void persist(get);
   },
+
+  setMuteVideosByDefault: (value) => {
+    set({ muteVideosByDefault: value });
+    void persist(get);
+  },
 }));
 
 function persist(get: () => SettingsState): Promise<void> {
-  const { themeMode, columnDensity, lastLocationName, promptSendVideo } = get();
-  return saveSettings({ themeMode, columnDensity, lastLocationName, promptSendVideo });
+  const { themeMode, columnDensity, lastLocationName, promptSendVideo, muteVideosByDefault } = get();
+  return saveSettings({
+    themeMode,
+    columnDensity,
+    lastLocationName,
+    promptSendVideo,
+    muteVideosByDefault,
+  });
 }

@@ -27,6 +27,8 @@ export default function Settings(): React.JSX.Element {
   const { colors, mode, setMode } = useTheme();
   const promptSendVideo = useSettingsStore((s) => s.promptSendVideo);
   const setPromptSendVideo = useSettingsStore((s) => s.setPromptSendVideo);
+  const muteVideosByDefault = useSettingsStore((s) => s.muteVideosByDefault);
+  const setMuteVideosByDefault = useSettingsStore((s) => s.setMuteVideosByDefault);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [checking, setChecking] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
@@ -110,6 +112,23 @@ export default function Settings(): React.JSX.Element {
             <Switch
               value={promptSendVideo}
               onValueChange={setPromptSendVideo}
+              trackColor={{ false: colors.surfaceAlt, true: colors.primary }}
+              thumbColor={colors.surface}
+            />
+          </View>
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          <View style={styles.row}>
+            <View style={styles.rowText}>
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+                Mute videos by default
+              </Text>
+              <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+                Start videos muted when you open them
+              </Text>
+            </View>
+            <Switch
+              value={muteVideosByDefault}
+              onValueChange={setMuteVideosByDefault}
               trackColor={{ false: colors.surfaceAlt, true: colors.primary }}
               thumbColor={colors.surface}
             />

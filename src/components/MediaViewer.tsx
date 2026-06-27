@@ -16,6 +16,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
+import { useSettingsStore } from '@/store/useSettingsStore';
 import type { MediaType } from '@/types';
 
 export interface ViewerMedia {
@@ -137,9 +138,10 @@ function VideoPage({
   width: number;
   height: number;
 }): React.JSX.Element {
+  const muteByDefault = useSettingsStore((s) => s.muteVideosByDefault);
   const player = useVideoPlayer(uri, (p) => {
     p.loop = false;
-    p.muted = true; // Mute videos by default
+    p.muted = muteByDefault;
   });
 
   useEffect(() => {
