@@ -71,6 +71,41 @@ export interface RouteWithGym extends BoulderRoute {
   gym: Gym;
   /** Full gallery, populated on detail loads; empty in list queries. */
   media: RouteMedia[];
+  /** Note entries, populated on detail loads; empty in list queries. */
+  noteEntries: RouteNote[];
+}
+
+/**
+ * A note attached to a route: free text plus an optional media item and an
+ * optional move plan drawn on that media. A note can be text-only (`mediaId`
+ * null), in which case the UI shows a placeholder where a thumbnail would be.
+ */
+export interface RouteNote {
+  readonly id: number;
+  routeId: number;
+  /** `route_media` row the note is attached to, or null for a text-only note. */
+  mediaId: number | null;
+  body: string | null;
+  /** Order within the route's notes; lower comes first. */
+  position: number;
+  createdAt: number;
+  updatedAt: number;
+  /** The attached media item, resolved on detail loads (null when text-only). */
+  media: RouteMedia | null;
+  /** True when a plan with at least one move exists for this note. */
+  hasPlan: boolean;
+}
+
+/**
+ * A note to persist. The attached media is matched to a gallery row by URI at
+ * save time, so the media must also be present in the route's `media` gallery.
+ */
+export interface RouteNoteInput {
+  /** Stable id of an existing note to preserve its plan across a save; omit for new notes. */
+  id?: number | null;
+  body: string | null;
+  /** URI of the attached gallery media item, or null for a text-only note. */
+  mediaUri: string | null;
 }
 
 export interface RouteInput {
@@ -85,7 +120,10 @@ export interface RouteInput {
   photoHeight?: number | null;
   grade?: string | null;
   completed: boolean;
+  /** Legacy single-string note column; kept for back-compat. */
   notes?: string | null;
+  /** Note entries to persist. Omit (undefined) to leave existing notes untouched. */
+  noteEntries?: RouteNoteInput[];
   startedAt?: number | null;
   completedAt?: number | null;
 }
@@ -139,6 +177,8 @@ export interface PlanMoveInput {
 export interface RoutePlan {
   readonly id: number;
   routeId: number;
+  /** The note this plan belongs to (v1.4.0+), or null for a route-level plan. */
+  noteId: number | null;
   /** The media item (photo) the plan is drawn on, or null if it was removed. */
   mediaId: number | null;
   name: string | null;
@@ -189,3 +229,6 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 
 /** Tiles per row in the route grid. */
 export type ColumnDensity = 1 | 2 | 3 | 4;
+
+/** How a route's notes are laid out on the detail card. */
+export type NotesLayout = 'rows' | 'grid';

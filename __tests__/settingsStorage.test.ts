@@ -17,6 +17,7 @@ describe('settingsStorage', () => {
       promptSendVideo: false,
       muteVideosByDefault: false,
       bubbleScale: 1.4,
+      notesLayout: 'grid',
     });
     expect(await loadSettings()).toEqual({
       themeMode: 'dark',
@@ -24,6 +25,7 @@ describe('settingsStorage', () => {
       promptSendVideo: false,
       muteVideosByDefault: false,
       bubbleScale: 1.4,
+      notesLayout: 'grid',
     });
   });
 

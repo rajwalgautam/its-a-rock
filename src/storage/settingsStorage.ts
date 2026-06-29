@@ -4,7 +4,7 @@ import {
   MAX_BUBBLE_SCALE,
   MIN_BUBBLE_SCALE,
 } from '@/constants/plan';
-import type { ColumnDensity, ThemeMode } from '@/types';
+import type { ColumnDensity, NotesLayout, ThemeMode } from '@/types';
 
 const SETTINGS_KEY = '@itsarock/settings';
 
@@ -18,6 +18,8 @@ export interface Settings {
   muteVideosByDefault: boolean;
   /** Size multiplier for the route planner's limb bubbles on the photo. */
   bubbleScale: number;
+  /** How a climb's notes are laid out on the detail card. */
+  notesLayout: NotesLayout;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -27,10 +29,12 @@ export const DEFAULT_SETTINGS: Settings = {
   promptSendVideo: true,
   muteVideosByDefault: true,
   bubbleScale: DEFAULT_BUBBLE_SCALE,
+  notesLayout: 'rows',
 };
 
 const VALID_MODES: ThemeMode[] = ['light', 'dark', 'system'];
 const VALID_DENSITIES: ColumnDensity[] = [1, 2, 3, 4];
+const VALID_NOTES_LAYOUTS: NotesLayout[] = ['rows', 'grid'];
 
 function validBubbleScale(value: unknown): number {
   return typeof value === 'number' &&
@@ -62,6 +66,9 @@ export async function loadSettings(): Promise<Settings> {
         ? parsed.muteVideosByDefault
         : DEFAULT_SETTINGS.muteVideosByDefault,
     bubbleScale: validBubbleScale(parsed.bubbleScale),
+    notesLayout: VALID_NOTES_LAYOUTS.includes(parsed.notesLayout as NotesLayout)
+      ? (parsed.notesLayout as NotesLayout)
+      : DEFAULT_SETTINGS.notesLayout,
   };
 }
 

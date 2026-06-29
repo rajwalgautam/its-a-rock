@@ -15,6 +15,8 @@ import type {
   RouteFilters,
   RouteInput,
   RouteMedia,
+  RouteNote,
+  RouteNoteInput,
   RoutePlan,
   RouteWithGym,
 } from '@/types';
@@ -112,6 +114,7 @@ function mapRoute(row: RouteJoinRow): RouteWithGym {
     // Populated by getRouteById; list queries leave the gallery empty and rely
     // on the cached cover (photoUri) for tiles.
     media: [],
+    noteEntries: [],
     gym: {
       id: row.gym_id,
       name: row.gym_name,
@@ -151,6 +154,111 @@ export async function getRouteMedia(routeId: number): Promise<RouteMedia[]> {
     [routeId],
   );
   return rows.map(mapMedia);
+}
+
+// ---- Route notes (v1.4.0) ----
+
+interface RouteNoteRow {
+  id: number;
+  route_id: number;
+  media_id: number | null;
+  body: string | null;
+  position: number;
+  created_at: number;
+  updated_at: number;
+}
+
+/** Notes for a route, in display order, each with its media and plan presence. */
+export async function getNotesForRoute(routeId: number): Promise<RouteNote[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<RouteNoteRow>(
+    'SELECT * FROM route_notes WHERE route_id = ? ORDER BY position ASC, id ASC',
+    [routeId],
+  );
+  const media = await getRouteMedia(routeId);
+  const byId = new Map(media.map((m) => [m.id, m] as const));
+  const notes: RouteNote[] = [];
+  for (const row of rows) {
+    const planRow = await db.getFirstAsync<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM route_plans p
+         JOIN plan_moves mv ON mv.plan_id = p.id
+       WHERE p.note_id = ?`,
+      [row.id],
+    );
+    notes.push({
+      id: row.id,
+      routeId: row.route_id,
+      mediaId: row.media_id,
+      body: row.body,
+      position: row.position,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      media: row.media_id !== null ? (byId.get(row.media_id) ?? null) : null,
+      hasPlan: (planRow?.n ?? 0) > 0,
+    });
+  }
+  return notes;
+}
+
+export async function getNoteById(noteId: number): Promise<RouteNote | null> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<RouteNoteRow>('SELECT * FROM route_notes WHERE id = ?', [
+    noteId,
+  ]);
+  if (row === null) return null;
+  const notes = await getNotesForRoute(row.route_id);
+  return notes.find((n) => n.id === noteId) ?? null;
+}
+
+/**
+ * Replace a route's notes with `entries`, preserving the row id (and thus any
+ * attached plan) of entries that carry one. Each entry's media is resolved to a
+ * `route_media` row by URI against the route's current gallery. Notes dropped
+ * from the list — and the plans anchored to them — are deleted.
+ */
+async function persistRouteNotes(
+  db: ReturnType<typeof getDatabase>,
+  routeId: number,
+  entries: RouteNoteInput[],
+  now: number,
+): Promise<void> {
+  const mediaRows = await db.getAllAsync<{ id: number; uri: string }>(
+    'SELECT id, uri FROM route_media WHERE route_id = ?',
+    [routeId],
+  );
+  const idByUri = new Map(mediaRows.map((m) => [m.uri, m.id] as const));
+  const existing = await db.getAllAsync<{ id: number }>(
+    'SELECT id FROM route_notes WHERE route_id = ?',
+    [routeId],
+  );
+  const keepIds = new Set(
+    entries.map((e) => e.id).filter((id): id is number => typeof id === 'number'),
+  );
+
+  // Drop notes (and their plans) that are no longer present.
+  for (const { id } of existing) {
+    if (!keepIds.has(id)) {
+      await db.runAsync('DELETE FROM route_plans WHERE note_id = ?', [id]);
+      await db.runAsync('DELETE FROM route_notes WHERE id = ?', [id]);
+    }
+  }
+
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i]!;
+    const mediaId = e.mediaUri !== null ? (idByUri.get(e.mediaUri) ?? null) : null;
+    if (typeof e.id === 'number' && keepIds.has(e.id)) {
+      await db.runAsync(
+        'UPDATE route_notes SET media_id = ?, body = ?, position = ?, updated_at = ? WHERE id = ?',
+        [mediaId, e.body, i, now, e.id],
+      );
+    } else {
+      await db.runAsync(
+        `INSERT INTO route_notes (route_id, media_id, body, position, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [routeId, mediaId, e.body, i, now, now],
+      );
+    }
+  }
 }
 
 /**
@@ -237,6 +345,9 @@ export async function createRoute(input: RouteInput): Promise<RouteWithGym> {
     );
     newId = result.lastInsertRowId;
     await replaceRouteMedia(db, newId, media, now);
+    if (input.noteEntries !== undefined) {
+      await persistRouteNotes(db, newId, input.noteEntries, now);
+    }
   });
   return getRouteByIdOrThrow(newId);
 }
@@ -284,6 +395,9 @@ export async function updateRoute(id: number, input: RouteInput): Promise<RouteW
     if (input.media !== undefined) {
       await replaceRouteMedia(db, id, input.media, now);
     }
+    if (input.noteEntries !== undefined) {
+      await persistRouteNotes(db, id, input.noteEntries, now);
+    }
   });
   return getRouteByIdOrThrow(id);
 }
@@ -299,6 +413,7 @@ export async function getRouteById(id: number): Promise<RouteWithGym | null> {
   if (row === null) return null;
   const route = mapRoute(row);
   route.media = await getRouteMedia(id);
+  route.noteEntries = await getNotesForRoute(id);
   return route;
 }
 
@@ -410,6 +525,7 @@ export async function getRoutesInRange(startMs: number, endMs: number): Promise<
 interface RoutePlanRow {
   id: number;
   route_id: number;
+  note_id: number | null;
   media_id: number | null;
   name: string | null;
   created_at: number;
@@ -452,6 +568,7 @@ function mapPlan(row: RoutePlanRow, moves: PlanMove[]): RoutePlan {
   return {
     id: row.id,
     routeId: row.route_id,
+    noteId: row.note_id,
     mediaId: row.media_id,
     name: row.name,
     moves,
@@ -490,14 +607,15 @@ export async function getPlanForRoute(routeId: number): Promise<RoutePlan | null
 export async function createPlan(
   routeId: number,
   mediaId: number | null,
+  noteId: number | null = null,
   name: string | null = null,
 ): Promise<RoutePlan> {
   const db = getDatabase();
   const now = Date.now();
   const result = await db.runAsync(
-    `INSERT INTO route_plans (route_id, media_id, name, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)`,
-    [routeId, mediaId, name, now, now],
+    `INSERT INTO route_plans (route_id, note_id, media_id, name, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [routeId, noteId, mediaId, name, now, now],
   );
   const plan = await getPlanById(result.lastInsertRowId);
   if (plan === null) throw new Error('Plan not found after create');
@@ -512,6 +630,28 @@ export async function getOrCreatePlanForRoute(
   const existing = await getPlanForRoute(routeId);
   if (existing !== null) return existing;
   return createPlan(routeId, mediaId);
+}
+
+/** The plan for a single note (v1.4.0+), or null if none exists yet. */
+export async function getPlanForNote(noteId: number): Promise<RoutePlan | null> {
+  const db = getDatabase();
+  const row = await db.getFirstAsync<RoutePlanRow>(
+    'SELECT * FROM route_plans WHERE note_id = ? ORDER BY id ASC LIMIT 1',
+    [noteId],
+  );
+  if (row === null) return null;
+  return mapPlan(row, await getPlanMoves(row.id));
+}
+
+/** Get a note's plan, creating an empty one on the note's media if absent. */
+export async function getOrCreatePlanForNote(
+  routeId: number,
+  noteId: number,
+  mediaId: number | null,
+): Promise<RoutePlan> {
+  const existing = await getPlanForNote(noteId);
+  if (existing !== null) return existing;
+  return createPlan(routeId, mediaId, noteId);
 }
 
 /**

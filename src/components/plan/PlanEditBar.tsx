@@ -20,6 +20,8 @@ interface PlanEditBarProps {
   onLimbChange: (limb: Limb) => void;
   grouping: boolean;
   onToggleGroup: () => void;
+  /** Grouping is unavailable (e.g. during the initial 4-limb seeding). */
+  groupDisabled?: boolean;
   onPlay: () => void;
   playDisabled: boolean;
   moveCount: number;
@@ -37,6 +39,7 @@ export function PlanEditBar({
   onLimbChange,
   grouping,
   onToggleGroup,
+  groupDisabled = false,
   onPlay,
   playDisabled,
   moveCount,
@@ -66,12 +69,16 @@ export function PlanEditBar({
         <View style={[styles.side, styles.sideStart]}>
           <Pressable
             onPress={onToggleGroup}
+            disabled={groupDisabled}
             style={[
               styles.actionBtn,
-              { backgroundColor: grouping ? colors.primary : colors.surfaceAlt },
+              {
+                backgroundColor: grouping ? colors.primary : colors.surfaceAlt,
+                opacity: groupDisabled ? 0.4 : 1,
+              },
             ]}
             accessibilityRole="button"
-            accessibilityState={{ selected: grouping }}
+            accessibilityState={{ selected: grouping, disabled: groupDisabled }}
             accessibilityLabel={grouping ? 'Grouping on' : 'Group moves'}
           >
             <Ionicons

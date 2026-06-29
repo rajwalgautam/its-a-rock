@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { RouteForm } from '@/components/RouteForm';
 import { MediaViewer } from '@/components/MediaViewer';
+import { NotesSection } from '@/components/NotesSection';
 import { useRouteStore } from '@/store/useRouteStore';
 import { formatDate, formatGradeLabel, statusLabel } from '@/utils/formatters';
 import type { RouteInput, RouteWithGym } from '@/types';
@@ -19,7 +19,6 @@ interface RouteCardProps {
 /** Reusable detail card that flips between view and edit; edits persist to SQLite. */
 export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element {
   const { colors } = useTheme();
-  const router = useRouter();
   const editRoute = useRouteStore((s) => s.editRoute);
   const [editing, setEditing] = useState(false);
   const [current, setCurrent] = useState(route);
@@ -32,6 +31,14 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
     onSaved?.(updated);
   }
 
+  /** Persist edits without leaving the form (used to anchor a note's plan). */
+  async function persistDraft(input: RouteInput): Promise<RouteWithGym> {
+    const updated = await editRoute(current.id, input);
+    setCurrent(updated);
+    onSaved?.(updated);
+    return updated;
+  }
+
   if (editing) {
     // RouteForm owns its own scroll + pinned footer, so it fills the screen.
     return (
@@ -39,6 +46,7 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
         initial={current}
         submitLabel="Save"
         onSubmit={handleSave}
+        onPersistDraft={persistDraft}
         onCancel={() => setEditing(false)}
       />
     );
@@ -46,7 +54,6 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
 
   const media = current.media;
   const hasMedia = media.length > 0;
-  const hasPhoto = media.some((m) => m.type === 'photo');
   const coverUri = current.photoUri;
   const videoCount = media.filter((m) => m.type === 'video').length;
 
@@ -112,22 +119,6 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
       {current.completedAt !== null && (
         <DetailRow icon="flag-outline" label="Sent" value={formatDate(current.completedAt)} />
       )}
-      {current.notes !== null && current.notes.length > 0 && (
-        <DetailRow icon="document-text-outline" value={current.notes} />
-      )}
-
-      {hasPhoto && (
-        <Pressable
-          onPress={() =>
-            router.push({ pathname: '/plan/[routeId]', params: { routeId: String(current.id) } })
-          }
-          style={[styles.editBtn, { borderColor: colors.border }]}
-        >
-          <Ionicons name="footsteps-outline" size={18} color={colors.primary} />
-          <Text style={[styles.editText, { color: colors.primary }]}>Plan route</Text>
-        </Pressable>
-      )}
-
       <Pressable
         onPress={() => setEditing(true)}
         style={[styles.editBtn, { borderColor: colors.border }]}
@@ -135,6 +126,8 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
         <Ionicons name="create-outline" size={18} color={colors.primary} />
         <Text style={[styles.editText, { color: colors.primary }]}>Edit</Text>
       </Pressable>
+
+      <NotesSection notes={current.noteEntries} />
     </ScrollView>
   );
 }

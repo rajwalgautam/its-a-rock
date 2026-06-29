@@ -20,6 +20,7 @@ function route(partial: Partial<RouteWithGym> & { gymId: number; gymName: string
     createdAt: partial.createdAt ?? id,
     updatedAt: id,
     media: [],
+    noteEntries: [],
     gym: {
       id: partial.gymId,
       name: partial.gymName,

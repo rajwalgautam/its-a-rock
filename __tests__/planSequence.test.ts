@@ -3,7 +3,10 @@ import {
   appendMove,
   framesOf,
   groupMoves,
+  isSeeding,
   nextGroupId,
+  nextSeedLimb,
+  placedLimbs,
   removeFromFrame,
   removeMove,
   reorderFrames,
@@ -173,5 +176,42 @@ describe('groupMoves', () => {
     ]);
     const single = [move('a')];
     expect(groupMoves(single, ['a'])).toBe(single);
+  });
+});
+
+describe('initial 4-limb seeding', () => {
+  const stance = [move('a', 'LH'), move('b', 'RH'), move('c', 'LF'), move('d', 'RF')];
+
+  it('placedLimbs returns the distinct limbs in the draft', () => {
+    expect(placedLimbs([move('a', 'LH'), move('b', 'LH'), move('c', 'RF')])).toEqual(
+      new Set<Limb>(['LH', 'RF']),
+    );
+  });
+
+  it('is seeding until all four limbs are placed', () => {
+    expect(isSeeding([])).toBe(true);
+    expect(isSeeding([move('a', 'LH'), move('b', 'RH'), move('c', 'LF')])).toBe(true);
+    expect(isSeeding(stance)).toBe(false);
+  });
+
+  it('a duplicated limb does not count toward the four', () => {
+    expect(isSeeding([move('a', 'LH'), move('b', 'LH'), move('c', 'RH'), move('d', 'LF')])).toBe(
+      true,
+    );
+  });
+
+  it('advances LH -> RH -> LF -> RF, skipping placed limbs', () => {
+    expect(nextSeedLimb('LH', [move('a', 'LH')])).toBe('RH');
+    expect(nextSeedLimb('RH', [move('a', 'LH'), move('b', 'RH')])).toBe('LF');
+    expect(nextSeedLimb('LF', [move('a', 'LH'), move('b', 'RH'), move('c', 'LF')])).toBe('RF');
+  });
+
+  it('wraps around to find the first unplaced limb when starting elsewhere', () => {
+    // Started with RF; only RF placed — next should wrap to LH.
+    expect(nextSeedLimb('RF', [move('a', 'RF')])).toBe('LH');
+  });
+
+  it('returns the current limb once every limb is placed', () => {
+    expect(nextSeedLimb('RF', stance)).toBe('RF');
   });
 });
