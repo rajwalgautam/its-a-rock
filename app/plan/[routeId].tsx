@@ -19,6 +19,7 @@ import { useSettingsStore } from '@/store/useSettingsStore';
 import { PlanCanvas, type CanvasMarker } from '@/components/plan/PlanCanvas';
 import { PlanEditBar } from '@/components/plan/PlanEditBar';
 import { MoveList } from '@/components/plan/MoveList';
+import { HelpSheet } from '@/components/plan/HelpSheet';
 import { PlaybackControls } from '@/components/plan/PlaybackControls';
 import {
   addToFrame,
@@ -105,6 +106,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
   // When grouping is on, every placement joins `groupId`; off means solo moves.
   const [groupId, setGroupId] = useState<number | null>(null);
   const [listOpen, setListOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [mode, setMode] = useState<'edit' | 'play'>('edit');
   const [step, setStep] = useState(0);
   const tempCounter = useRef(0);
@@ -369,8 +371,11 @@ export default function RoutePlanScreen(): React.JSX.Element {
           onOpenList={() => setListOpen(true)}
           bubbleScale={bubbleScale}
           onBubbleScaleChange={setBubbleScale}
+          onHelp={() => setHelpOpen(true)}
         />
       )}
+
+      <HelpSheet visible={helpOpen} onClose={() => setHelpOpen(false)} />
 
       <MoveList
         visible={listOpen}
