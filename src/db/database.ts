@@ -200,4 +200,53 @@ async function migrateToV4(db: SQLite.SQLiteDatabase): Promise<void> {
          AND NOT EXISTS (SELECT 1 FROM route_notes n WHERE n.route_id = routes.id)`,
     [Date.now(), Date.now()],
   );
+
+  await rehomeLegacyPlans(db);
+}
+
+/**
+ * Pre-v4 plans were anchored to a route + photo with no note. The new UI only
+ * reaches a plan through its note, so re-home each orphaned plan onto a note:
+ * claim the route's first media-less note (combining the backfilled text with
+ * the planned photo) when one exists, otherwise create a note for it. Plan
+ * moves are left untouched. Idempotent — only plans still missing a note_id are
+ * considered, so a second run finds none.
+ */
+async function rehomeLegacyPlans(db: SQLite.SQLiteDatabase): Promise<void> {
+  const orphans = await db.getAllAsync<{ id: number; route_id: number; media_id: number }>(
+    `SELECT id, route_id, media_id FROM route_plans
+       WHERE note_id IS NULL AND media_id IS NOT NULL`,
+  );
+  for (const plan of orphans) {
+    const now = Date.now();
+    // Prefer an existing note with no media and no plan of its own.
+    const free = await db.getFirstAsync<{ id: number }>(
+      `SELECT n.id FROM route_notes n
+         WHERE n.route_id = ? AND n.media_id IS NULL
+           AND NOT EXISTS (SELECT 1 FROM route_plans p WHERE p.note_id = n.id)
+         ORDER BY n.position ASC LIMIT 1`,
+      [plan.route_id],
+    );
+    let noteId: number;
+    if (free !== null) {
+      await db.runAsync('UPDATE route_notes SET media_id = ?, updated_at = ? WHERE id = ?', [
+        plan.media_id,
+        now,
+        free.id,
+      ]);
+      noteId = free.id;
+    } else {
+      const nextPos = await db.getFirstAsync<{ pos: number }>(
+        'SELECT COALESCE(MAX(position) + 1, 0) AS pos FROM route_notes WHERE route_id = ?',
+        [plan.route_id],
+      );
+      const result = await db.runAsync(
+        `INSERT INTO route_notes (route_id, media_id, body, position, created_at, updated_at)
+         VALUES (?, ?, NULL, ?, ?, ?)`,
+        [plan.route_id, plan.media_id, nextPos?.pos ?? 0, now, now],
+      );
+      noteId = result.lastInsertRowId;
+    }
+    await db.runAsync('UPDATE route_plans SET note_id = ? WHERE id = ?', [noteId, plan.id]);
+  }
 }
