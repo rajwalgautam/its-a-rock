@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { StyleSheet, Text } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -8,14 +9,16 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
-import { FONT_SIZE, SPACING } from '@/constants/theme';
+import { SPACING } from '@/constants/theme';
+import { LIMB_ICON, LIMB_ICON_FLIP, LIMB_NAME } from '@/constants/limbs';
 import { toNormalized, toScreen, type Point } from '@/utils/coords';
 import type { ImageRect } from '@/utils/imageLayout';
+import type { Limb } from '@/types';
 
 /** 44dp touch target (a11y minimum) with a smaller visible dot centered in it. */
 const TOUCH = 44;
 const DOT = 30;
-/** Collapsed marker: a small numbered dot that barely covers the hold. */
+/** Collapsed marker: a small dot that barely covers the hold. */
 const DOT_SM = 18;
 
 interface LimbMarkerProps {
@@ -24,14 +27,15 @@ interface LimbMarkerProps {
   y: number;
   layout: ImageRect;
   color: string;
-  label: string;
+  /** Which limb this marker represents — drives the hand/foot icon. */
+  limb: Limb;
   /** Sequence badge (1-based) shown in edit mode; omit/null to hide. */
   badge?: number | null;
   selected?: boolean;
   draggable?: boolean;
   /** Glide to new positions (used in playback); instant otherwise. */
   animated?: boolean;
-  /** Collapse to a small numbered dot so the hold underneath stays visible. */
+  /** Collapse to a small dot so the hold underneath stays visible. */
   compact?: boolean;
   /** Size multiplier for the visible dot (user-configurable bubble size). */
   bubbleScale?: number;
@@ -46,18 +50,20 @@ interface LimbMarkerProps {
 }
 
 /**
- * A colored, draggable limb marker positioned from normalized coordinates. Its
- * live screen position lives in shared values so dragging runs on the UI thread;
- * the position re-syncs from props whenever the underlying point or the image
- * layout changes (a drag commit, a reorder, or a rotation/resize), so there is
- * no jump between gesture end and the React state update.
+ * A colored, draggable limb marker positioned from normalized coordinates. It
+ * shows the same hand/foot icon as the limb selector (left foot mirrored) with
+ * the move's sequence number as a small badge. Its live screen position lives
+ * in shared values so dragging runs on the UI thread; the position re-syncs
+ * from props whenever the underlying point or the image layout changes (a drag
+ * commit, a reorder, or a rotation/resize), so there is no jump between gesture
+ * end and the React state update.
  */
 export function LimbMarker({
   x,
   y,
   layout,
   color,
-  label,
+  limb,
   badge = null,
   selected = false,
   draggable = false,
@@ -72,8 +78,10 @@ export function LimbMarker({
   // 44dp a11y minimum but expands to wrap a dot larger than that.
   const dotSize = (compact ? DOT_SM : DOT) * bubbleScale;
   const touchSize = Math.max(TOUCH, dotSize + SPACING.sm);
-  const labelSize = Math.max(8, Math.round(FONT_SIZE.xs * bubbleScale));
-  const dotSmTextSize = Math.max(7, Math.round(9 * bubbleScale));
+  // The hand/foot glyph fills most of the dot.
+  const iconSize = Math.max(8, Math.round(dotSize * 0.66));
+  const badgeSize = Math.max(13, Math.round((compact ? 12 : 15) * bubbleScale));
+  const badgeFont = Math.max(7, Math.round((compact ? 8 : 9) * bubbleScale));
 
   const screen = toScreen({ x, y }, layout);
   const posX = useSharedValue(screen.x);
@@ -124,47 +132,41 @@ export function LimbMarker({
       <Animated.View
         style={[styles.touch, { width: touchSize, height: touchSize }, style]}
         accessibilityRole="button"
-        accessibilityLabel={`${label} marker`}
+        accessibilityLabel={`${LIMB_NAME[limb]} marker`}
       >
-        {compact ? (
+        <Animated.View
+          style={[
+            styles.dot,
+            {
+              width: dotSize,
+              height: dotSize,
+              borderRadius: dotSize / 2,
+              backgroundColor: color,
+              borderWidth: selected ? (compact ? 2.5 : 3) : 1.5,
+            },
+          ]}
+        >
+          <MaterialCommunityIcons
+            name={LIMB_ICON[limb]}
+            size={iconSize}
+            color="#FFFFFF"
+            style={LIMB_ICON_FLIP[limb] ? styles.flip : undefined}
+          />
+        </Animated.View>
+        {badge !== null && (
           <Animated.View
             style={[
-              styles.dotSm,
+              styles.badge,
               {
-                width: dotSize,
-                height: dotSize,
-                borderRadius: dotSize / 2,
-                backgroundColor: color,
-                borderWidth: selected ? 2.5 : 1.5,
+                minWidth: badgeSize,
+                height: badgeSize,
+                borderRadius: badgeSize / 2,
+                borderColor: color,
               },
             ]}
           >
-            {badge !== null && (
-              <Text style={[styles.dotSmText, { fontSize: dotSmTextSize }]}>{badge}</Text>
-            )}
+            <Text style={[styles.badgeText, { color, fontSize: badgeFont }]}>{badge}</Text>
           </Animated.View>
-        ) : (
-          <>
-            <Animated.View
-              style={[
-                styles.dot,
-                {
-                  width: dotSize,
-                  height: dotSize,
-                  borderRadius: dotSize / 2,
-                  backgroundColor: color,
-                  borderWidth: selected ? 3 : 1.5,
-                },
-              ]}
-            >
-              <Text style={[styles.label, { fontSize: labelSize }]}>{label}</Text>
-            </Animated.View>
-            {badge !== null && (
-              <Animated.View style={[styles.badge, { borderColor: color }]}>
-                <Text style={[styles.badgeText, { color }]}>{badge}</Text>
-              </Animated.View>
-            )}
-          </>
         )}
       </Animated.View>
     </GestureDetector>
@@ -184,34 +186,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dotSm: {
-    borderColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dotSmText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-  },
-  label: {
-    color: '#FFFFFF',
-    fontWeight: '800',
+  flip: {
+    transform: [{ scaleX: -1 }],
   },
   badge: {
     position: 'absolute',
-    top: -2,
-    right: -2,
-    minWidth: 16,
-    height: 16,
+    top: -3,
+    right: -3,
     paddingHorizontal: 3,
-    borderRadius: 8,
     borderWidth: 1.5,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   badgeText: {
-    fontSize: 9,
     fontWeight: '800',
   },
 });

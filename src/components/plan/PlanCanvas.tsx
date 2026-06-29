@@ -7,7 +7,6 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { LIMB_LABEL } from '@/constants/limbs';
 import { useTheme } from '@/theme/ThemeProvider';
 import { toNormalized, toScreen, type Point } from '@/utils/coords';
 import { imageLayout } from '@/utils/imageLayout';
@@ -200,7 +199,7 @@ export function PlanCanvas({
                   y={m.y}
                   layout={layout}
                   color={m.color}
-                  label={LIMB_LABEL[m.limb]}
+                  limb={m.limb}
                   badge={m.badge}
                   selected={m.key === selectedKey || m.highlighted === true}
                   draggable={editable}

@@ -3,6 +3,7 @@
 // through these functions, then persists via `savePlanMoves`. Keeping the logic
 // here makes it unit-testable without a renderer or a database.
 
+import { LIMB_ORDER } from '@/constants/limbs';
 import type { Limb, PlanMoveInput, RoutePlan } from '@/types';
 import type { Point } from './coords';
 
@@ -46,6 +47,37 @@ export function toInputs(moves: DraftMove[]): PlanMoveInput[] {
 
 export function appendMove(moves: DraftMove[], move: DraftMove): DraftMove[] {
   return [...moves, move];
+}
+
+// ---- Initial 4-limb seeding ----
+
+/** Distinct limbs already placed anywhere in the draft. */
+export function placedLimbs(moves: DraftMove[]): Set<Limb> {
+  return new Set(moves.map((m) => m.limb));
+}
+
+/**
+ * Whether the plan is still in its starting-stance "seeding" phase — the user
+ * must place all four limbs before free editing begins. True until every limb
+ * in `LIMB_ORDER` has at least one placement.
+ */
+export function isSeeding(moves: DraftMove[]): boolean {
+  return placedLimbs(moves).size < LIMB_ORDER.length;
+}
+
+/**
+ * The next limb to place during seeding: scan `LIMB_ORDER` starting just after
+ * `current` (wrapping) and return the first limb not yet placed. Falls back to
+ * `current` when every limb is already down.
+ */
+export function nextSeedLimb(current: Limb, moves: DraftMove[]): Limb {
+  const placed = placedLimbs(moves);
+  const start = LIMB_ORDER.indexOf(current);
+  for (let i = 1; i <= LIMB_ORDER.length; i++) {
+    const candidate = LIMB_ORDER[(start + i) % LIMB_ORDER.length]!;
+    if (!placed.has(candidate)) return candidate;
+  }
+  return current;
 }
 
 /** Next group id for a plan: one past the largest in use (ids are per-plan). */

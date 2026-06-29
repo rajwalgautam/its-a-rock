@@ -20,12 +20,15 @@ interface PlanEditBarProps {
   onLimbChange: (limb: Limb) => void;
   grouping: boolean;
   onToggleGroup: () => void;
+  /** Grouping is unavailable (e.g. during the initial 4-limb seeding). */
+  groupDisabled?: boolean;
   onPlay: () => void;
   playDisabled: boolean;
   moveCount: number;
   onOpenList: () => void;
   bubbleScale: number;
   onBubbleScaleChange: (value: number) => void;
+  onHelp: () => void;
 }
 
 /**
@@ -37,12 +40,14 @@ export function PlanEditBar({
   onLimbChange,
   grouping,
   onToggleGroup,
+  groupDisabled = false,
   onPlay,
   playDisabled,
   moveCount,
   onOpenList,
   bubbleScale,
   onBubbleScaleChange,
+  onHelp,
 }: PlanEditBarProps): React.JSX.Element {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -58,7 +63,7 @@ export function PlanEditBar({
         },
       ]}
     >
-      <BubbleSizeControl value={bubbleScale} onChange={onBubbleScaleChange} />
+      <BubbleSizeControl value={bubbleScale} onChange={onBubbleScaleChange} onHelp={onHelp} />
 
       <LimbSelector active={activeLimb} onChange={onLimbChange} />
 
@@ -66,12 +71,16 @@ export function PlanEditBar({
         <View style={[styles.side, styles.sideStart]}>
           <Pressable
             onPress={onToggleGroup}
+            disabled={groupDisabled}
             style={[
               styles.actionBtn,
-              { backgroundColor: grouping ? colors.primary : colors.surfaceAlt },
+              {
+                backgroundColor: grouping ? colors.primary : colors.surfaceAlt,
+                opacity: groupDisabled ? 0.4 : 1,
+              },
             ]}
             accessibilityRole="button"
-            accessibilityState={{ selected: grouping }}
+            accessibilityState={{ selected: grouping, disabled: groupDisabled }}
             accessibilityLabel={grouping ? 'Grouping on' : 'Group moves'}
           >
             <Ionicons
@@ -120,9 +129,11 @@ export function PlanEditBar({
 function BubbleSizeControl({
   value,
   onChange,
+  onHelp,
 }: {
   value: number;
   onChange: (value: number) => void;
+  onHelp: () => void;
 }): React.JSX.Element {
   const { colors } = useTheme();
   const scale = nearestBubbleScale(value);
@@ -132,7 +143,18 @@ function BubbleSizeControl({
 
   return (
     <View style={styles.sizeRow}>
-      <Text style={[styles.sizeLabel, { color: colors.textSecondary }]}>Bubble size</Text>
+      <View style={styles.sizeLabelGroup}>
+        <Pressable
+          onPress={onHelp}
+          hitSlop={8}
+          style={styles.helpBtn}
+          accessibilityRole="button"
+          accessibilityLabel="How the planner works"
+        >
+          <Ionicons name="help-circle-outline" size={22} color={colors.textSecondary} />
+        </Pressable>
+        <Text style={[styles.sizeLabel, { color: colors.textSecondary }]}>Bubble size</Text>
+      </View>
       <View style={styles.sizeStepper}>
         <Pressable
           onPress={() => onChange(stepBubbleScale(scale, -1))}
@@ -187,6 +209,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.xs,
+  },
+  sizeLabelGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  helpBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sizeLabel: {
     fontSize: FONT_SIZE.sm,

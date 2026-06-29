@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ColumnDensity, ThemeMode } from '@/types';
+import type { ColumnDensity, NotesLayout, ThemeMode } from '@/types';
 import {
   DEFAULT_SETTINGS,
   loadSettings,
@@ -16,6 +16,7 @@ interface SettingsState extends Settings {
   setPromptSendVideo: (value: boolean) => void;
   setMuteVideosByDefault: (value: boolean) => void;
   setBubbleScale: (value: number) => void;
+  setNotesLayout: (value: NotesLayout) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -25,6 +26,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   promptSendVideo: DEFAULT_SETTINGS.promptSendVideo,
   muteVideosByDefault: DEFAULT_SETTINGS.muteVideosByDefault,
   bubbleScale: DEFAULT_SETTINGS.bubbleScale,
+  notesLayout: DEFAULT_SETTINGS.notesLayout,
   isLoaded: false,
 
   load: async () => {
@@ -61,6 +63,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ bubbleScale: value });
     void persist(get);
   },
+
+  setNotesLayout: (value) => {
+    set({ notesLayout: value });
+    void persist(get);
+  },
 }));
 
 function persist(get: () => SettingsState): Promise<void> {
@@ -71,6 +78,7 @@ function persist(get: () => SettingsState): Promise<void> {
     promptSendVideo,
     muteVideosByDefault,
     bubbleScale,
+    notesLayout,
   } = get();
   return saveSettings({
     themeMode,
@@ -79,5 +87,6 @@ function persist(get: () => SettingsState): Promise<void> {
     promptSendVideo,
     muteVideosByDefault,
     bubbleScale,
+    notesLayout,
   });
 }

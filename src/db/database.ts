@@ -51,7 +51,7 @@ export async function initDatabase(): Promise<void> {
 }
 
 /** Latest schema version; bump and add a branch in runMigrations per change. */
-const LATEST_SCHEMA_VERSION = 3;
+const LATEST_SCHEMA_VERSION = 4;
 
 /**
  * Apply pending schema migrations, tracked by SQLite's `user_version`. Fresh
@@ -75,6 +75,11 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   if (version < 3) {
     await migrateToV3(db);
     version = 3;
+  }
+
+  if (version < 4) {
+    await migrateToV4(db);
+    version = 4;
   }
 
   if (version !== LATEST_SCHEMA_VERSION) version = LATEST_SCHEMA_VERSION;
@@ -154,5 +159,94 @@ async function migrateToV3(db: SQLite.SQLiteDatabase): Promise<void> {
   const cols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(plan_moves)');
   if (!cols.some((c) => c.name === 'group_id')) {
     await db.execAsync('ALTER TABLE plan_moves ADD COLUMN group_id INTEGER');
+  }
+}
+
+/**
+ * v4: notes become first-class entries. `route_notes` holds many notes per
+ * route, each with optional `media_id` (a `route_media` row it's attached to,
+ * null for text-only) and an optional move plan. Plans gain a nullable
+ * `note_id` so "plan this move" attaches to a note's media instead of the whole
+ * route. The legacy `routes.notes` column is kept and backfilled into one note
+ * per route. `ADD COLUMN` isn't idempotent, so guard on the existing columns.
+ */
+async function migrateToV4(db: SQLite.SQLiteDatabase): Promise<void> {
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS route_notes (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      route_id   INTEGER NOT NULL REFERENCES routes(id) ON DELETE CASCADE,
+      media_id   INTEGER REFERENCES route_media(id) ON DELETE SET NULL,
+      body       TEXT,
+      position   INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_route_notes_route ON route_notes (route_id, position);
+  `);
+
+  const planCols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(route_plans)');
+  if (!planCols.some((c) => c.name === 'note_id')) {
+    await db.execAsync('ALTER TABLE route_plans ADD COLUMN note_id INTEGER');
+  }
+
+  // Backfill: every existing single note string becomes the first note entry.
+  // The NOT EXISTS guard keeps this safe to re-run.
+  await db.runAsync(
+    `INSERT INTO route_notes (route_id, media_id, body, position, created_at, updated_at)
+       SELECT id, NULL, notes, 0, ?, ?
+       FROM routes
+       WHERE notes IS NOT NULL AND notes != ''
+         AND NOT EXISTS (SELECT 1 FROM route_notes n WHERE n.route_id = routes.id)`,
+    [Date.now(), Date.now()],
+  );
+
+  await rehomeLegacyPlans(db);
+}
+
+/**
+ * Pre-v4 plans were anchored to a route + photo with no note. The new UI only
+ * reaches a plan through its note, so re-home each orphaned plan onto a note:
+ * claim the route's first media-less note (combining the backfilled text with
+ * the planned photo) when one exists, otherwise create a note for it. Plan
+ * moves are left untouched. Idempotent — only plans still missing a note_id are
+ * considered, so a second run finds none.
+ */
+async function rehomeLegacyPlans(db: SQLite.SQLiteDatabase): Promise<void> {
+  const orphans = await db.getAllAsync<{ id: number; route_id: number; media_id: number }>(
+    `SELECT id, route_id, media_id FROM route_plans
+       WHERE note_id IS NULL AND media_id IS NOT NULL`,
+  );
+  for (const plan of orphans) {
+    const now = Date.now();
+    // Prefer an existing note with no media and no plan of its own.
+    const free = await db.getFirstAsync<{ id: number }>(
+      `SELECT n.id FROM route_notes n
+         WHERE n.route_id = ? AND n.media_id IS NULL
+           AND NOT EXISTS (SELECT 1 FROM route_plans p WHERE p.note_id = n.id)
+         ORDER BY n.position ASC LIMIT 1`,
+      [plan.route_id],
+    );
+    let noteId: number;
+    if (free !== null) {
+      await db.runAsync('UPDATE route_notes SET media_id = ?, updated_at = ? WHERE id = ?', [
+        plan.media_id,
+        now,
+        free.id,
+      ]);
+      noteId = free.id;
+    } else {
+      const nextPos = await db.getFirstAsync<{ pos: number }>(
+        'SELECT COALESCE(MAX(position) + 1, 0) AS pos FROM route_notes WHERE route_id = ?',
+        [plan.route_id],
+      );
+      const result = await db.runAsync(
+        `INSERT INTO route_notes (route_id, media_id, body, position, created_at, updated_at)
+         VALUES (?, ?, NULL, ?, ?, ?)`,
+        [plan.route_id, plan.media_id, nextPos?.pos ?? 0, now, now],
+      );
+      noteId = result.lastInsertRowId;
+    }
+    await db.runAsync('UPDATE route_plans SET note_id = ? WHERE id = ?', [noteId, plan.id]);
   }
 }

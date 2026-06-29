@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { PlanMoveInput, RoutePlan } from '@/types';
 import {
+  getOrCreatePlanForNote,
   getOrCreatePlanForRoute,
   persistPlanPhoto,
   savePlanMoves,
@@ -15,6 +16,15 @@ interface PlanState {
    * photo to durable storage so the plan can't be orphaned by cache eviction.
    */
   loadPlan: (routeId: number, mediaId: number | null) => Promise<RoutePlan | null>;
+  /**
+   * Load (or create) a single note's plan on the given photo (v1.4.0+). Also
+   * persists the photo to durable storage so the plan can't be orphaned.
+   */
+  loadNotePlan: (
+    routeId: number,
+    noteId: number,
+    mediaId: number | null,
+  ) => Promise<RoutePlan | null>;
   /** Replace the current plan's moves (renumbering sequence) and persist. */
   saveMoves: (moves: PlanMoveInput[]) => Promise<RoutePlan | null>;
   clear: () => void;
@@ -37,6 +47,25 @@ export const usePlanStore = create<PlanState>((set, get) => ({
         }
       }
       const plan = await getOrCreatePlanForRoute(routeId, mediaId);
+      set({ plan, isLoading: false });
+      return plan;
+    } catch (e) {
+      set({ error: errMessage(e), isLoading: false });
+      return null;
+    }
+  },
+
+  loadNotePlan: async (routeId, noteId, mediaId) => {
+    set({ isLoading: true, error: null });
+    try {
+      if (mediaId !== null) {
+        try {
+          await persistPlanPhoto(mediaId);
+        } catch {
+          // ignore — fall back to the original (cache) URI
+        }
+      }
+      const plan = await getOrCreatePlanForNote(routeId, noteId, mediaId);
       set({ plan, isLoading: false });
       return plan;
     } catch (e) {

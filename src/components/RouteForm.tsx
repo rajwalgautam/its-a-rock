@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -11,19 +11,22 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useSettingsStore } from '@/store/useSettingsStore';
+import { useRouteStore } from '@/store/useRouteStore';
 import { GradePicker } from '@/components/GradePicker';
 import { MediaGalleryField } from '@/components/MediaGalleryField';
 import { LocationPickerField } from '@/components/LocationPickerField';
+import { NotesEditor, type NoteDraft } from '@/components/NotesEditor';
 import { formatDate } from '@/utils/formatters';
 import { startOfDayMs } from '@/utils/dateUtils';
 import { validateRouteInput } from '@/utils/validators';
-import { addMedia } from '@/utils/mediaUtils';
+import { addMedia, coverItem } from '@/utils/mediaUtils';
 import { confirmAddVideo, pickVideoFromLibrary } from '@/utils/mediaPicker';
-import type { MediaItem, RouteInput, RouteWithGym } from '@/types';
+import type { MediaItem, RouteInput, RouteNote, RouteWithGym } from '@/types';
 
 interface RouteFormProps {
   /** Existing route to edit; omit for a new climb. */
@@ -32,6 +35,11 @@ interface RouteFormProps {
   initialMedia?: MediaItem[];
   submitLabel: string;
   onSubmit: (input: RouteInput) => Promise<void> | void;
+  /**
+   * Persist the in-progress form without leaving it, returning the saved route.
+   * Required to plan a note's move (the note must exist to anchor a plan).
+   */
+  onPersistDraft?: (input: RouteInput) => Promise<RouteWithGym>;
   onCancel?: () => void;
 }
 
@@ -41,9 +49,21 @@ interface FormState {
   media: MediaItem[];
   grade: string | null;
   completed: boolean;
-  notes: string;
+  notes: NoteDraft[];
   startedAt: number | null;
   completedAt: number | null;
+}
+
+/** Build editor drafts from a route's persisted notes. */
+function notesToDrafts(notes: RouteNote[]): NoteDraft[] {
+  return notes.map((n) => ({
+    id: n.id,
+    key: `note-existing-${n.id}`,
+    body: n.body ?? '',
+    mediaUri: n.media?.uri ?? null,
+    mediaType: n.media?.type ?? null,
+    hasPlan: n.hasPlan,
+  }));
 }
 
 function toState(initial?: RouteWithGym, initialMedia?: MediaItem[]): FormState {
@@ -57,22 +77,33 @@ function toState(initial?: RouteWithGym, initialMedia?: MediaItem[]): FormState 
         : (initialMedia ?? []),
     grade: initial?.grade ?? null,
     completed: initial?.completed ?? false,
-    notes: initial?.notes ?? '',
+    notes: initial !== undefined ? notesToDrafts(initial.noteEntries) : [],
     startedAt: initial?.startedAt ?? null,
     completedAt: initial?.completedAt ?? null,
   };
 }
 
-function toInput(s: FormState): RouteInput {
+/** A draft worth persisting: has body text or attached media. */
+function isMeaningful(n: NoteDraft): boolean {
+  return n.body.trim().length > 0 || n.mediaUri !== null;
+}
+
+function toInput(s: FormState, { dropEmpty }: { dropEmpty: boolean }): RouteInput {
   const trimmedName = s.name.trim();
-  const trimmedNotes = s.notes.trim();
+  const drafts = dropEmpty ? s.notes.filter(isMeaningful) : s.notes;
   return {
     name: trimmedName.length > 0 ? trimmedName : null,
     gymName: s.gymName,
     media: s.media,
     grade: s.grade,
     completed: s.completed,
-    notes: trimmedNotes.length > 0 ? trimmedNotes : null,
+    // The legacy single-string column is retired in favor of note entries.
+    notes: null,
+    noteEntries: drafts.map((n) => ({
+      id: n.id,
+      body: n.body.trim().length > 0 ? n.body.trim() : null,
+      mediaUri: n.mediaUri,
+    })),
     startedAt: s.startedAt,
     completedAt: s.completedAt,
   };
@@ -84,23 +115,61 @@ export function RouteForm({
   initialMedia,
   submitLabel,
   onSubmit,
+  onPersistDraft,
   onCancel,
 }: RouteFormProps): React.JSX.Element {
   const { colors } = useTheme();
+  const router = useRouter();
   const headerHeight = useHeaderHeight();
+  const getRoute = useRouteStore((s) => s.getRoute);
   const setLastLocationName = useSettingsStore((s) => s.setLastLocationName);
   const promptSendVideo = useSettingsStore((s) => s.promptSendVideo);
   const [state, setState] = useState<FormState>(() => toState(initial, initialMedia));
   const [errors, setErrors] = useState<ReturnType<typeof validateRouteInput>['errors']>({});
   const [saving, setSaving] = useState(false);
   const [datePickerField, setDatePickerField] = useState<'started' | 'completed' | null>(null);
+  // The route id once it exists (an edit starts with one; a new climb gets one
+  // the first time a note is planned). Drives reloads after the planner closes.
+  const savedIdRef = useRef<number | null>(initial?.id ?? null);
+  const pendingReload = useRef(false);
 
   function patch(p: Partial<FormState>): void {
     setState((prev) => ({ ...prev, ...p }));
   }
 
+  /** Rebuild state from a freshly saved route (canonical ids + durable URIs). */
+  function syncFromRoute(route: RouteWithGym): void {
+    savedIdRef.current = route.id;
+    setState((prev) => ({
+      ...prev,
+      media: route.media.map((m) => ({
+        uri: m.uri,
+        type: m.type,
+        width: m.width,
+        height: m.height,
+      })),
+      notes: notesToDrafts(route.noteEntries),
+    }));
+  }
+
+  // After the planner screen closes, reload so the note's plan state and any
+  // durable photo URI are reflected back in the form.
+  useFocusEffect(
+    useCallback(() => {
+      if (!pendingReload.current || savedIdRef.current === null) return;
+      pendingReload.current = false;
+      let active = true;
+      void getRoute(savedIdRef.current).then((route) => {
+        if (active && route !== null) syncFromRoute(route);
+      });
+      return () => {
+        active = false;
+      };
+    }, [getRoute]),
+  );
+
   async function handleSubmit(): Promise<void> {
-    const input = toInput(state);
+    const input = toInput(state, { dropEmpty: true });
     const result = validateRouteInput(input);
     if (!result.valid) {
       setErrors(result.errors);
@@ -114,6 +183,47 @@ export function RouteForm({
         setLastLocationName(state.gymName);
       }
       await onSubmit(input);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** Attach freshly picked media to a note, adding it to the gallery too. */
+  function attachMediaToNote(key: string, item: MediaItem): void {
+    setState((prev) => ({
+      ...prev,
+      media: addMedia(prev.media, [item]),
+      notes: prev.notes.map((n) =>
+        n.key === key ? { ...n, mediaUri: item.uri, mediaType: item.type } : n,
+      ),
+    }));
+  }
+
+  /** Persist the form, then open the planner for the given note's media. */
+  async function handlePlanNote(key: string): Promise<void> {
+    if (onPersistDraft === undefined) return;
+    const input = toInput(state, { dropEmpty: false });
+    const result = validateRouteInput(input);
+    if (!result.valid) {
+      setErrors(result.errors);
+      return;
+    }
+    setErrors({});
+    const targetIndex = state.notes.findIndex((n) => n.key === key);
+    if (targetIndex < 0) return;
+    setSaving(true);
+    try {
+      if (state.gymName.length > 0) setLastLocationName(state.gymName);
+      const saved = await onPersistDraft(input);
+      syncFromRoute(saved);
+      // Notes persist in order, so the target keeps its index. Resolve its id.
+      const note = saved.noteEntries[targetIndex];
+      if (note === undefined || note.mediaId === null) return;
+      pendingReload.current = true;
+      router.push({
+        pathname: '/plan/[routeId]',
+        params: { routeId: String(saved.id), noteId: String(note.id) },
+      });
     } finally {
       setSaving(false);
     }
@@ -204,14 +314,13 @@ export function RouteForm({
         )}
       </Field>
 
-      <Field label="Notes (optional)">
-        <TextInput
-          value={state.notes}
-          onChangeText={(notes) => patch({ notes })}
-          placeholder="Beta, conditions, how it felt…"
-          placeholderTextColor={colors.textMuted}
-          multiline
-          style={[styles.input, styles.multiline, inputColors(colors)]}
+      <Field label="Notes">
+        <NotesEditor
+          notes={state.notes}
+          favorite={coverItem(state.media)}
+          onChange={(notes) => patch({ notes })}
+          onAttachMedia={attachMediaToNote}
+          onPlan={(key) => void handlePlanNote(key)}
         />
       </Field>
 

@@ -2,14 +2,16 @@ import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { FONT_SIZE, SPACING } from '@/constants/theme';
-import { LIMB_ORDER, limbColor } from '@/constants/limbs';
+import { LIMB_NAME, LIMB_ORDER, limbColor } from '@/constants/limbs';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useRouteStore } from '@/store/useRouteStore';
 import { usePlanStore } from '@/store/usePlanStore';
@@ -17,6 +19,7 @@ import { useSettingsStore } from '@/store/useSettingsStore';
 import { PlanCanvas, type CanvasMarker } from '@/components/plan/PlanCanvas';
 import { PlanEditBar } from '@/components/plan/PlanEditBar';
 import { MoveList } from '@/components/plan/MoveList';
+import { HelpSheet } from '@/components/plan/HelpSheet';
 import { PlaybackControls } from '@/components/plan/PlaybackControls';
 import {
   addToFrame,
@@ -25,8 +28,10 @@ import {
   framesOf,
   fromPlan,
   groupMoves,
+  isSeeding,
   movingLimbsAt,
   nextGroupId,
+  nextSeedLimb,
   removeFromFrame,
   removeMove,
   reorderFrames,
@@ -43,6 +48,13 @@ interface Ready {
   mediaId: number;
   imgW: number;
   imgH: number;
+}
+
+/** Pick the media a note's plan is drawn on. */
+function notePhoto(route: RouteWithGym, noteId: number): RouteWithGym['media'][number] | null {
+  const note = route.noteEntries.find((n) => n.id === noteId);
+  if (note?.media != null && note.media.type === 'photo') return note.media;
+  return null;
 }
 type LoadState =
   | { status: 'loading' }
@@ -78,9 +90,11 @@ async function resolveDimensions(
 
 export default function RoutePlanScreen(): React.JSX.Element {
   const { colors } = useTheme();
-  const params = useLocalSearchParams<{ routeId: string }>();
+  const router = useRouter();
+  const params = useLocalSearchParams<{ routeId: string; noteId?: string }>();
   const getRoute = useRouteStore((s) => s.getRoute);
   const loadPlan = usePlanStore((s) => s.loadPlan);
+  const loadNotePlan = usePlanStore((s) => s.loadNotePlan);
   const saveMoves = usePlanStore((s) => s.saveMoves);
   const bubbleScale = useSettingsStore((s) => s.bubbleScale);
   const setBubbleScale = useSettingsStore((s) => s.setBubbleScale);
@@ -92,6 +106,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
   // When grouping is on, every placement joins `groupId`; off means solo moves.
   const [groupId, setGroupId] = useState<number | null>(null);
   const [listOpen, setListOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [mode, setMode] = useState<'edit' | 'play'>('edit');
   const [step, setStep] = useState(0);
   const tempCounter = useRef(0);
@@ -105,6 +120,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
   }, []);
 
   const routeId = Number(params.routeId);
+  const noteId = params.noteId !== undefined ? Number(params.noteId) : null;
 
   useFocusEffect(
     useCallback(() => {
@@ -120,14 +136,22 @@ export default function RoutePlanScreen(): React.JSX.Element {
           setState({ status: 'missing' });
           return;
         }
-        const photo = planPhoto(route);
+        // A note id scopes the plan to a single note's media; otherwise fall
+        // back to the route's cover photo (legacy route-level plans).
+        const photo =
+          noteId !== null && Number.isFinite(noteId)
+            ? notePhoto(route, noteId)
+            : planPhoto(route);
         if (photo === null) {
           setState({ status: 'no-photo' });
           return;
         }
         // Load/create the plan first — this persists the photo to durable
         // storage and repoints its URI; re-read the route to get that URI.
-        const plan = await loadPlan(routeId, photo.id);
+        const plan =
+          noteId !== null && Number.isFinite(noteId)
+            ? await loadNotePlan(routeId, noteId, photo.id)
+            : await loadPlan(routeId, photo.id);
         const durable = await getRoute(routeId);
         if (!active) return;
         const durablePhoto =
@@ -154,7 +178,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
       return () => {
         active = false;
       };
-    }, [routeId, getRoute, loadPlan, applyMoves]),
+    }, [routeId, noteId, getRoute, loadPlan, loadNotePlan, applyMoves]),
   );
 
   /** Optimistically apply an edit, persist it, then reconcile keys/sequence. */
@@ -169,15 +193,20 @@ export default function RoutePlanScreen(): React.JSX.Element {
 
   function handlePlace(norm: Point): void {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // While seeding the starting stance, every placement is solo (grouping is
+    // disabled) and the active limb auto-advances to the next unplaced one.
+    const seeding = isSeeding(movesRef.current);
     const move: DraftMove = {
       key: `new-${tempCounter.current++}`,
       limb: activeLimb,
       x: norm.x,
       y: norm.y,
       holdId: null,
-      groupId,
+      groupId: seeding ? null : groupId,
     };
-    void commitMoves(appendMove(movesRef.current, move));
+    const next = appendMove(movesRef.current, move);
+    if (seeding) setActiveLimb(nextSeedLimb(activeLimb, next));
+    void commitMoves(next);
   }
 
   function handleCommitMarker(key: string, norm: Point): void {
@@ -243,7 +272,10 @@ export default function RoutePlanScreen(): React.JSX.Element {
   }
 
   const playing = mode === 'play';
-  const grouping = groupId !== null;
+  const seeding = isSeeding(moves);
+  // Grouping is suppressed until the starting stance is complete.
+  const grouping = !seeding && groupId !== null;
+  const placedCount = new Set(moves.map((m) => m.limb)).size;
   const safeStep = Math.min(step, frames.length);
   const movingLimbs = playing ? movingLimbsAt(moves, safeStep) : [];
 
@@ -277,6 +309,20 @@ export default function RoutePlanScreen(): React.JSX.Element {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Done planning"
+            >
+              <Ionicons name="checkmark" size={26} color={colors.primary} />
+            </Pressable>
+          ),
+        }}
+      />
       <View style={styles.canvas}>
         <PlanCanvas
           photoUri={state.photoUri}
@@ -291,12 +337,14 @@ export default function RoutePlanScreen(): React.JSX.Element {
           onSelectMarker={setSelectedKey}
           onCommitMarker={handleCommitMarker}
         />
-        {!playing && (moves.length === 0 || grouping) && (
+        {!playing && (seeding || grouping) && (
           <View style={styles.hint} pointerEvents="none">
             <Text style={[styles.hintText, { color: colors.onOverlay, backgroundColor: colors.overlay }]}>
-              {grouping
-                ? 'Grouping on — limbs you place now move together.'
-                : 'Pick a limb below, then tap the wall to place it.'}
+              {seeding
+                ? `Place all 4 limbs to set your start (${placedCount}/4) — tap the wall to place your ${LIMB_NAME[activeLimb].toLowerCase()}.`
+                : grouping
+                  ? 'Grouping on — limbs you place now move together.'
+                  : ''}
             </Text>
           </View>
         )}
@@ -316,14 +364,18 @@ export default function RoutePlanScreen(): React.JSX.Element {
           onLimbChange={setActiveLimb}
           grouping={grouping}
           onToggleGroup={toggleGrouping}
+          groupDisabled={seeding}
           onPlay={enterPlay}
-          playDisabled={moves.length === 0}
+          playDisabled={moves.length === 0 || seeding}
           moveCount={moves.length}
           onOpenList={() => setListOpen(true)}
           bubbleScale={bubbleScale}
           onBubbleScaleChange={setBubbleScale}
+          onHelp={() => setHelpOpen(true)}
         />
       )}
+
+      <HelpSheet visible={helpOpen} onClose={() => setHelpOpen(false)} />
 
       <MoveList
         visible={listOpen}
