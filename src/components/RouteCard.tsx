@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { RouteForm } from '@/components/RouteForm';
@@ -8,7 +9,7 @@ import { MediaViewer } from '@/components/MediaViewer';
 import { NotesSection } from '@/components/NotesSection';
 import { useRouteStore } from '@/store/useRouteStore';
 import { formatDate, formatGradeLabel, statusLabel } from '@/utils/formatters';
-import type { RouteInput, RouteWithGym } from '@/types';
+import type { RouteInput, RouteNote, RouteWithGym } from '@/types';
 
 interface RouteCardProps {
   route: RouteWithGym;
@@ -19,10 +20,19 @@ interface RouteCardProps {
 /** Reusable detail card that flips between view and edit; edits persist to SQLite. */
 export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element {
   const { colors } = useTheme();
+  const router = useRouter();
   const editRoute = useRouteStore((s) => s.editRoute);
   const [editing, setEditing] = useState(false);
   const [current, setCurrent] = useState(route);
   const [viewerOpen, setViewerOpen] = useState(false);
+
+  /** Open a note's plan in the full planner, scoped to that note's media. */
+  function openNotePlan(note: RouteNote): void {
+    router.push({
+      pathname: '/plan/[routeId]',
+      params: { routeId: String(current.id), noteId: String(note.id) },
+    });
+  }
 
   async function handleSave(input: RouteInput): Promise<void> {
     const updated = await editRoute(current.id, input);
@@ -127,7 +137,7 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
         <Text style={[styles.editText, { color: colors.primary }]}>Edit</Text>
       </Pressable>
 
-      <NotesSection notes={current.noteEntries} />
+      <NotesSection notes={current.noteEntries} onPressNote={openNotePlan} />
     </ScrollView>
   );
 }

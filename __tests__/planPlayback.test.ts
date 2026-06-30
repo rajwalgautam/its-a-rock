@@ -8,7 +8,7 @@ import {
 import type { Limb } from '@/types';
 
 function move(limb: Limb, x: number, y: number, groupId: number | null = null): DraftMove {
-  return { key: `${limb}-${x}-${y}`, limb, x, y, holdId: null, groupId };
+  return { key: `${limb}-${x}-${y}`, limb, x, y, holdId: null, groupId, floating: false };
 }
 
 // LH→RH→LF→RF, then LH moves again to a new hold.
