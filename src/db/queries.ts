@@ -540,6 +540,7 @@ interface PlanMoveRow {
   x: number;
   y: number;
   group_id: number | null;
+  floating: number;
   sequence: number;
   created_at: number;
 }
@@ -559,6 +560,7 @@ function mapPlanMove(row: PlanMoveRow): PlanMove {
     x: row.x,
     y: row.y,
     groupId: row.group_id,
+    floating: row.floating === 1,
     sequence: row.sequence,
     createdAt: row.created_at,
   };
@@ -666,9 +668,9 @@ export async function savePlanMoves(planId: number, moves: PlanMoveInput[]): Pro
     for (let i = 0; i < moves.length; i++) {
       const m = moves[i]!;
       await db.runAsync(
-        `INSERT INTO plan_moves (plan_id, limb, hold_id, x, y, group_id, sequence, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [planId, m.limb, m.holdId ?? null, m.x, m.y, m.groupId ?? null, i, now],
+        `INSERT INTO plan_moves (plan_id, limb, hold_id, x, y, group_id, floating, sequence, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [planId, m.limb, m.holdId ?? null, m.x, m.y, m.groupId ?? null, m.floating ? 1 : 0, i, now],
       );
     }
     await db.runAsync('UPDATE route_plans SET updated_at = ? WHERE id = ?', [now, planId]);

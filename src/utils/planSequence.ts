@@ -20,6 +20,8 @@ export interface DraftMove {
    * frame). Null is a solo move.
    */
   groupId: number | null;
+  /** Visual-only flag: greyed out to mark an optional/uncommitted hold. */
+  floating: boolean;
 }
 
 /** Build editable moves from a persisted plan (keys are the row ids). */
@@ -31,6 +33,7 @@ export function fromPlan(plan: RoutePlan): DraftMove[] {
     y: m.y,
     holdId: m.holdId,
     groupId: m.groupId,
+    floating: m.floating,
   }));
 }
 
@@ -42,7 +45,13 @@ export function toInputs(moves: DraftMove[]): PlanMoveInput[] {
     y: m.y,
     holdId: m.holdId,
     groupId: m.groupId,
+    floating: m.floating,
   }));
+}
+
+/** Toggle a move's floating (greyed-out) annotation by key. */
+export function toggleFloating(moves: DraftMove[], key: string): DraftMove[] {
+  return moves.map((m) => (m.key === key ? { ...m, floating: !m.floating } : m));
 }
 
 export function appendMove(moves: DraftMove[], move: DraftMove): DraftMove[] {

@@ -37,6 +37,8 @@ interface LimbMarkerProps {
   animated?: boolean;
   /** Collapse to a small dot so the hold underneath stays visible. */
   compact?: boolean;
+  /** Greyed-out "floating" annotation — an optional/uncommitted hold. */
+  floating?: boolean;
   /** Size multiplier for the visible dot (user-configurable bubble size). */
   bubbleScale?: number;
   /**
@@ -47,6 +49,8 @@ interface LimbMarkerProps {
   onSelect?: () => void;
   /** Called with the new normalized position when a drag ends. */
   onCommit?: (norm: Point) => void;
+  /** Long-press toggles the floating (greyed-out) annotation. */
+  onToggleFloating?: () => void;
 }
 
 /**
@@ -69,10 +73,12 @@ export function LimbMarker({
   draggable = false,
   animated = false,
   compact = false,
+  floating = false,
   bubbleScale = 1,
   scale,
   onSelect,
   onCommit,
+  onToggleFloating,
 }: LimbMarkerProps): React.JSX.Element {
   // Dot grows with the user's bubble-size preference; the touch box keeps the
   // 44dp a11y minimum but expands to wrap a dot larger than that.
@@ -105,6 +111,10 @@ export function LimbMarker({
     onSelect?.();
   }
 
+  function toggleFloating(): void {
+    onToggleFloating?.();
+  }
+
   const pan = Gesture.Pan()
     .enabled(draggable)
     .onChange((e) => {
@@ -120,7 +130,14 @@ export function LimbMarker({
     runOnJS(select)();
   });
 
-  const gesture = Gesture.Race(pan, tap);
+  const longPress = Gesture.LongPress()
+    .enabled(onToggleFloating !== undefined)
+    .minDuration(350)
+    .onStart(() => {
+      runOnJS(toggleFloating)();
+    });
+
+  const gesture = Gesture.Race(pan, longPress, tap);
 
   const style = useAnimatedStyle(() => ({
     left: posX.value - touchSize / 2,
@@ -133,6 +150,7 @@ export function LimbMarker({
         style={[styles.touch, { width: touchSize, height: touchSize }, style]}
         accessibilityRole="button"
         accessibilityLabel={`${LIMB_NAME[limb]} marker`}
+        accessibilityHint={floating ? 'Floating; long-press to restore' : 'Long-press to mark floating'}
       >
         <Animated.View
           style={[
@@ -143,6 +161,7 @@ export function LimbMarker({
               borderRadius: dotSize / 2,
               backgroundColor: color,
               borderWidth: selected ? (compact ? 2.5 : 3) : 1.5,
+              opacity: floating ? 0.35 : 1,
             },
           ]}
         >
@@ -152,22 +171,25 @@ export function LimbMarker({
             color="#FFFFFF"
             style={LIMB_ICON_FLIP[limb] ? styles.flip : undefined}
           />
+          {/* Anchored to the dot (not the larger touch box) so it stays pinned
+              to the marker even when the bubble is scaled small. */}
+          {badge !== null && (
+            <Animated.View
+              style={[
+                styles.badge,
+                {
+                  minWidth: badgeSize,
+                  height: badgeSize,
+                  borderRadius: badgeSize / 2,
+                  borderColor: color,
+                  opacity: floating ? 0.35 : 1,
+                },
+              ]}
+            >
+              <Text style={[styles.badgeText, { color, fontSize: badgeFont }]}>{badge}</Text>
+            </Animated.View>
+          )}
         </Animated.View>
-        {badge !== null && (
-          <Animated.View
-            style={[
-              styles.badge,
-              {
-                minWidth: badgeSize,
-                height: badgeSize,
-                borderRadius: badgeSize / 2,
-                borderColor: color,
-              },
-            ]}
-          >
-            <Text style={[styles.badgeText, { color, fontSize: badgeFont }]}>{badge}</Text>
-          </Animated.View>
-        )}
       </Animated.View>
     </GestureDetector>
   );

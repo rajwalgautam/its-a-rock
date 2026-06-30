@@ -159,6 +159,11 @@ export interface PlanMove {
    * (one frame). Null is a solo move. Ids are only unique within a plan.
    */
   groupId: number | null;
+  /**
+   * Visual annotation: a "floating" marker is greyed out to flag an optional or
+   * uncommitted hold. It does not affect sequence, grouping, or playback.
+   */
+  floating: boolean;
   /** 0-based, contiguous order within the plan. */
   sequence: number;
   createdAt: number;
@@ -171,6 +176,7 @@ export interface PlanMoveInput {
   x: number;
   y: number;
   groupId?: number | null;
+  floating?: boolean;
 }
 
 /** An ordered sequence of moves drawn on one photo of a route. */

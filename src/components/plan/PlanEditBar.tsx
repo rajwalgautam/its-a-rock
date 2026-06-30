@@ -29,6 +29,8 @@ interface PlanEditBarProps {
   bubbleScale: number;
   onBubbleScaleChange: (value: number) => void;
   onHelp: () => void;
+  onUndo: () => void;
+  undoDisabled: boolean;
 }
 
 /**
@@ -48,6 +50,8 @@ export function PlanEditBar({
   bubbleScale,
   onBubbleScaleChange,
   onHelp,
+  onUndo,
+  undoDisabled,
 }: PlanEditBarProps): React.JSX.Element {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -63,12 +67,25 @@ export function PlanEditBar({
         },
       ]}
     >
-      <BubbleSizeControl value={bubbleScale} onChange={onBubbleScaleChange} onHelp={onHelp} />
+      <BubbleSizeControl value={bubbleScale} onChange={onBubbleScaleChange} />
 
       <LimbSelector active={activeLimb} onChange={onLimbChange} />
 
       <View style={styles.actions}>
         <View style={[styles.side, styles.sideStart]}>
+          <Pressable
+            onPress={onUndo}
+            disabled={undoDisabled}
+            style={[
+              styles.actionBtn,
+              { backgroundColor: colors.surfaceAlt, opacity: undoDisabled ? 0.4 : 1 },
+            ]}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: undoDisabled }}
+            accessibilityLabel="Undo last edit"
+          >
+            <Ionicons name="arrow-undo" size={22} color={colors.textPrimary} />
+          </Pressable>
           <Pressable
             onPress={onToggleGroup}
             disabled={groupDisabled}
@@ -108,6 +125,14 @@ export function PlanEditBar({
 
         <View style={[styles.side, styles.sideEnd]}>
           <Pressable
+            onPress={onHelp}
+            style={[styles.actionBtn, { backgroundColor: colors.surfaceAlt }]}
+            accessibilityRole="button"
+            accessibilityLabel="How the planner works"
+          >
+            <Ionicons name="help-circle-outline" size={22} color={colors.textPrimary} />
+          </Pressable>
+          <Pressable
             onPress={onOpenList}
             style={[styles.actionBtn, { backgroundColor: colors.surfaceAlt }]}
             accessibilityRole="button"
@@ -129,11 +154,9 @@ export function PlanEditBar({
 function BubbleSizeControl({
   value,
   onChange,
-  onHelp,
 }: {
   value: number;
   onChange: (value: number) => void;
-  onHelp: () => void;
 }): React.JSX.Element {
   const { colors } = useTheme();
   const scale = nearestBubbleScale(value);
@@ -143,18 +166,7 @@ function BubbleSizeControl({
 
   return (
     <View style={styles.sizeRow}>
-      <View style={styles.sizeLabelGroup}>
-        <Pressable
-          onPress={onHelp}
-          hitSlop={8}
-          style={styles.helpBtn}
-          accessibilityRole="button"
-          accessibilityLabel="How the planner works"
-        >
-          <Ionicons name="help-circle-outline" size={22} color={colors.textSecondary} />
-        </Pressable>
-        <Text style={[styles.sizeLabel, { color: colors.textSecondary }]}>Bubble size</Text>
-      </View>
+      <Text style={[styles.sizeLabel, { color: colors.textSecondary }]}>Bubble size</Text>
       <View style={styles.sizeStepper}>
         <Pressable
           onPress={() => onChange(stepBubbleScale(scale, -1))}
@@ -207,17 +219,9 @@ const styles = StyleSheet.create({
   sizeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
+    gap: SPACING.md,
     paddingHorizontal: SPACING.xs,
-  },
-  sizeLabelGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  helpBtn: {
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   sizeLabel: {
     fontSize: FONT_SIZE.sm,
@@ -247,13 +251,15 @@ const styles = StyleSheet.create({
   },
   side: {
     flex: 1,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
   },
   sideStart: {
-    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
   },
   sideEnd: {
-    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
   },
   center: {
     flex: 1,

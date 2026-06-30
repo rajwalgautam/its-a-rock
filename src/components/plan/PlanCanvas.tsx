@@ -28,6 +28,8 @@ export interface CanvasMarker {
   groupId?: number | null;
   /** Force the selected (emphasized) styling regardless of `selectedKey`. */
   highlighted?: boolean;
+  /** Greyed-out "floating" annotation — an optional/uncommitted hold. */
+  floating?: boolean;
 }
 
 /** Radius (image px) around a marker within which a tap selects rather than places. */
@@ -51,6 +53,7 @@ interface PlanCanvasProps {
   onPlace?: (norm: Point) => void;
   onSelectMarker?: (key: string) => void;
   onCommitMarker?: (key: string, norm: Point) => void;
+  onToggleFloating?: (key: string) => void;
 }
 
 /**
@@ -70,6 +73,7 @@ export function PlanCanvas({
   onPlace,
   onSelectMarker,
   onCommitMarker,
+  onToggleFloating,
 }: PlanCanvasProps): React.JSX.Element {
   const { colors } = useTheme();
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -205,10 +209,14 @@ export function PlanCanvas({
                   draggable={editable}
                   animated={animatedMarkers}
                   compact={m.dot}
+                  floating={m.floating}
                   bubbleScale={bubbleScale}
                   scale={scale}
                   onSelect={() => onSelectMarker?.(m.key)}
                   onCommit={(norm) => onCommitMarker?.(m.key, norm)}
+                  onToggleFloating={
+                    editable && onToggleFloating ? () => onToggleFloating(m.key) : undefined
+                  }
                 />
               ))}
           </Animated.View>

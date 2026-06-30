@@ -51,7 +51,7 @@ export async function initDatabase(): Promise<void> {
 }
 
 /** Latest schema version; bump and add a branch in runMigrations per change. */
-const LATEST_SCHEMA_VERSION = 4;
+const LATEST_SCHEMA_VERSION = 5;
 
 /**
  * Apply pending schema migrations, tracked by SQLite's `user_version`. Fresh
@@ -80,6 +80,11 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   if (version < 4) {
     await migrateToV4(db);
     version = 4;
+  }
+
+  if (version < 5) {
+    await migrateToV5(db);
+    version = 5;
   }
 
   if (version !== LATEST_SCHEMA_VERSION) version = LATEST_SCHEMA_VERSION;
@@ -159,6 +164,20 @@ async function migrateToV3(db: SQLite.SQLiteDatabase): Promise<void> {
   const cols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(plan_moves)');
   if (!cols.some((c) => c.name === 'group_id')) {
     await db.execAsync('ALTER TABLE plan_moves ADD COLUMN group_id INTEGER');
+  }
+}
+
+/**
+ * v5: "floating" markers. A boolean `floating` on `plan_moves` lets a climber
+ * grey out an optional/uncommitted hold (a smear, a foot they might skip)
+ * without deleting it. Purely a visual annotation — sequence, grouping, and
+ * playback are unaffected. Defaults to 0 so existing moves load unchanged.
+ * `ADD COLUMN` isn't idempotent, so guard on the existing columns.
+ */
+async function migrateToV5(db: SQLite.SQLiteDatabase): Promise<void> {
+  const cols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(plan_moves)');
+  if (!cols.some((c) => c.name === 'floating')) {
+    await db.execAsync('ALTER TABLE plan_moves ADD COLUMN floating INTEGER NOT NULL DEFAULT 0');
   }
 }
 

@@ -11,6 +11,7 @@ import {
   removeMove,
   reorderFrames,
   reorderMoves,
+  toggleFloating,
   toInputs,
   updateMovePosition,
   type DraftMove,
@@ -18,7 +19,7 @@ import {
 import type { Limb } from '@/types';
 
 function move(key: string, limb: Limb = 'LH', groupId: number | null = null): DraftMove {
-  return { key, limb, x: 0.5, y: 0.5, holdId: null, groupId };
+  return { key, limb, x: 0.5, y: 0.5, holdId: null, groupId, floating: false };
 }
 
 const keys = (moves: DraftMove[]): string[] => moves.map((m) => m.key);
@@ -74,13 +75,28 @@ describe('updateMovePosition', () => {
 describe('toInputs', () => {
   it('strips editor keys and preserves order + fields', () => {
     const moves: DraftMove[] = [
-      { key: 'a', limb: 'RH', x: 0.2, y: 0.3, holdId: 7, groupId: 1 },
-      { key: 'b', limb: 'LF', x: 0.8, y: 0.9, holdId: null, groupId: null },
+      { key: 'a', limb: 'RH', x: 0.2, y: 0.3, holdId: 7, groupId: 1, floating: false },
+      { key: 'b', limb: 'LF', x: 0.8, y: 0.9, holdId: null, groupId: null, floating: true },
     ];
     expect(toInputs(moves)).toEqual([
-      { limb: 'RH', x: 0.2, y: 0.3, holdId: 7, groupId: 1 },
-      { limb: 'LF', x: 0.8, y: 0.9, holdId: null, groupId: null },
+      { limb: 'RH', x: 0.2, y: 0.3, holdId: 7, groupId: 1, floating: false },
+      { limb: 'LF', x: 0.8, y: 0.9, holdId: null, groupId: null, floating: true },
     ]);
+  });
+});
+
+describe('toggleFloating', () => {
+  it('flips only the matching move and is reversible', () => {
+    const base = [move('a'), move('b')];
+    const once = toggleFloating(base, 'b');
+    expect(once.map((m) => m.floating)).toEqual([false, true]);
+    const back = toggleFloating(once, 'b');
+    expect(back.map((m) => m.floating)).toEqual([false, false]);
+  });
+
+  it('leaves the list unchanged when the key is absent', () => {
+    const base = [move('a'), move('b')];
+    expect(toggleFloating(base, 'z').map((m) => m.floating)).toEqual([false, false]);
   });
 });
 

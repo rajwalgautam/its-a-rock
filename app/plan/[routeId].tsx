@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -35,6 +36,7 @@ import {
   removeFromFrame,
   removeMove,
   reorderFrames,
+  toggleFloating,
   toInputs,
   updateMovePosition,
   type DraftMove,
@@ -48,6 +50,8 @@ interface Ready {
   mediaId: number;
   imgW: number;
   imgH: number;
+  /** The note's text, shown as context while planning (null when none). */
+  noteBody: string | null;
 }
 
 /** Pick the media a note's plan is drawn on. */
@@ -109,10 +113,13 @@ export default function RoutePlanScreen(): React.JSX.Element {
   const [helpOpen, setHelpOpen] = useState(false);
   const [mode, setMode] = useState<'edit' | 'play'>('edit');
   const [step, setStep] = useState(0);
+  const [canUndo, setCanUndo] = useState(false);
   const tempCounter = useRef(0);
   // Mirrors `moves` so handlers always read the latest array, immune to the
   // stale closures that rapid taps would otherwise hit.
   const movesRef = useRef<DraftMove[]>([]);
+  // Pre-edit snapshots for undo; in-memory only, reset when a plan (re)loads.
+  const undoStack = useRef<DraftMove[][]>([]);
 
   const applyMoves = useCallback((next: DraftMove[]) => {
     movesRef.current = next;
@@ -167,12 +174,19 @@ export default function RoutePlanScreen(): React.JSX.Element {
           return;
         }
         applyMoves(plan !== null ? fromPlan(plan) : []);
+        undoStack.current = [];
+        setCanUndo(false);
+        const note =
+          noteId !== null && Number.isFinite(noteId)
+            ? (durable ?? route).noteEntries.find((n) => n.id === noteId)
+            : undefined;
         setState({
           status: 'ready',
           photoUri: durablePhoto.uri,
           mediaId: photo.id,
           imgW: dims.w,
           imgH: dims.h,
+          noteBody: note?.body ?? null,
         });
       })();
       return () => {
@@ -181,8 +195,8 @@ export default function RoutePlanScreen(): React.JSX.Element {
     }, [routeId, noteId, getRoute, loadPlan, loadNotePlan, applyMoves]),
   );
 
-  /** Optimistically apply an edit, persist it, then reconcile keys/sequence. */
-  const commitMoves = useCallback(
+  /** Apply an edit, persist it, then reconcile keys/sequence from the save. */
+  const persist = useCallback(
     async (next: DraftMove[]) => {
       applyMoves(next);
       const saved = await saveMoves(toInputs(next));
@@ -190,6 +204,26 @@ export default function RoutePlanScreen(): React.JSX.Element {
     },
     [saveMoves, applyMoves],
   );
+
+  /** Persist an edit, snapshotting the pre-edit state so it can be undone. */
+  const commitMoves = useCallback(
+    async (next: DraftMove[]) => {
+      // Keep the last 50 snapshots to bound memory on long sessions.
+      undoStack.current = [...undoStack.current.slice(-49), movesRef.current];
+      setCanUndo(true);
+      await persist(next);
+    },
+    [persist],
+  );
+
+  /** Revert the most recent edit, re-committing the prior snapshot. */
+  const handleUndo = useCallback(() => {
+    const prev = undoStack.current.pop();
+    if (prev === undefined) return;
+    setCanUndo(undoStack.current.length > 0);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void persist(prev);
+  }, [persist]);
 
   function handlePlace(norm: Point): void {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -203,6 +237,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
       y: norm.y,
       holdId: null,
       groupId: seeding ? null : groupId,
+      floating: false,
     };
     const next = appendMove(movesRef.current, move);
     if (seeding) setActiveLimb(nextSeedLimb(activeLimb, next));
@@ -211,6 +246,11 @@ export default function RoutePlanScreen(): React.JSX.Element {
 
   function handleCommitMarker(key: string, norm: Point): void {
     void commitMoves(updateMovePosition(movesRef.current, key, norm.x, norm.y));
+  }
+
+  function handleToggleFloating(key: string): void {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    void commitMoves(toggleFloating(movesRef.current, key));
   }
 
   /** Toggle grouping; turning it on allocates a fresh frame id for placements. */
@@ -304,6 +344,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
       badge: i + 1,
       dot: i !== moves.length - 1 && m.key !== selectedKey,
       groupId: m.groupId,
+      floating: m.floating,
     }));
   }
 
@@ -336,6 +377,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
           onPlace={handlePlace}
           onSelectMarker={setSelectedKey}
           onCommitMarker={handleCommitMarker}
+          onToggleFloating={handleToggleFloating}
         />
         {!playing && (seeding || grouping) && (
           <View style={styles.hint} pointerEvents="none">
@@ -349,6 +391,16 @@ export default function RoutePlanScreen(): React.JSX.Element {
           </View>
         )}
       </View>
+
+      {state.noteBody !== null && state.noteBody.length > 0 && (
+        <ScrollView
+          style={[styles.noteBlurb, { backgroundColor: colors.surface, borderTopColor: colors.border }]}
+          contentContainerStyle={styles.noteBlurbContent}
+          showsVerticalScrollIndicator
+        >
+          <Text style={[styles.noteText, { color: colors.textSecondary }]}>{state.noteBody}</Text>
+        </ScrollView>
+      )}
 
       {playing ? (
         <PlaybackControls
@@ -372,6 +424,8 @@ export default function RoutePlanScreen(): React.JSX.Element {
           bubbleScale={bubbleScale}
           onBubbleScaleChange={setBubbleScale}
           onHelp={() => setHelpOpen(true)}
+          onUndo={handleUndo}
+          undoDisabled={!canUndo}
         />
       )}
 
@@ -423,5 +477,18 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     borderRadius: 999,
     overflow: 'hidden',
+  },
+  noteBlurb: {
+    flexGrow: 0,
+    maxHeight: 96,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  noteBlurbContent: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+  },
+  noteText: {
+    fontSize: FONT_SIZE.sm,
+    lineHeight: 20,
   },
 });
