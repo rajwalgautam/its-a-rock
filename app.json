@@ -2,7 +2,7 @@
   "expo": {
     "name": "It's A Rock",
     "slug": "its-a-rock",
-    "version": "0.4.2",
+    "version": "1.5.3",
     "scheme": "itsarock",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -22,7 +22,8 @@
       "permissions": [
         "android.permission.REQUEST_INSTALL_PACKAGES",
         "android.permission.VIBRATE"
-      ]
+      ],
+      "versionCode": 10503
     },
     "plugins": [
       "expo-router",
