@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -39,8 +40,14 @@ interface LimbMarkerProps {
   compact?: boolean;
   /** Greyed-out "floating" annotation — an optional/uncommitted hold. */
   floating?: boolean;
+  /** This limb's latest placement — draw a "current stance" ring. */
+  current?: boolean;
+  /** Dim the marker (a superseded, non-current placement). */
+  muted?: boolean;
   /** Size multiplier for the visible dot (user-configurable bubble size). */
   bubbleScale?: number;
+  /** Opacity multiplier for the dot/badge (user-configurable transparency). */
+  bubbleOpacity?: number;
   /**
    * Live canvas zoom factor. Drag deltas arrive in screen pixels, so they are
    * divided by this to move the marker the right amount in image space.
@@ -49,7 +56,7 @@ interface LimbMarkerProps {
   onSelect?: () => void;
   /** Called with the new normalized position when a drag ends. */
   onCommit?: (norm: Point) => void;
-  /** Long-press toggles the floating (greyed-out) annotation. */
+  /** Double-tap toggles the floating (greyed-out) annotation. */
   onToggleFloating?: () => void;
 }
 
@@ -74,7 +81,10 @@ export function LimbMarker({
   animated = false,
   compact = false,
   floating = false,
+  current = false,
+  muted = false,
   bubbleScale = 1,
+  bubbleOpacity = 1,
   scale,
   onSelect,
   onCommit,
@@ -88,6 +98,9 @@ export function LimbMarker({
   const iconSize = Math.max(8, Math.round(dotSize * 0.66));
   const badgeSize = Math.max(13, Math.round((compact ? 12 : 15) * bubbleScale));
   const badgeFont = Math.max(7, Math.round((compact ? 8 : 9) * bubbleScale));
+  // Current-stance ring: a thin accent halo sitting just outside the dot.
+  const ringGap = Math.max(2, Math.round(3 * bubbleScale));
+  const ringWidth = Math.max(1.5, Math.round(2 * bubbleScale));
 
   const screen = toScreen({ x, y }, layout);
   const posX = useSharedValue(screen.x);
@@ -115,8 +128,19 @@ export function LimbMarker({
     onToggleFloating?.();
   }
 
+  function liftHaptic(): void {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }
+
+  // A marker only moves after a deliberate hold, so casual taps (select) and
+  // one-finger canvas gestures don't nudge it. The hold "lifts" it, then the
+  // finger drags it.
   const pan = Gesture.Pan()
     .enabled(draggable)
+    .activateAfterLongPress(300)
+    .onStart(() => {
+      runOnJS(liftHaptic)();
+    })
     .onChange((e) => {
       const s = scale ? scale.value : 1;
       posX.value += e.changeX / s;
@@ -126,18 +150,20 @@ export function LimbMarker({
       runOnJS(commit)(posX.value, posY.value);
     });
 
+  const doubleTap = Gesture.Tap()
+    .enabled(onToggleFloating !== undefined)
+    .numberOfTaps(2)
+    .maxDistance(20)
+    .onEnd(() => {
+      runOnJS(toggleFloating)();
+    });
+
   const tap = Gesture.Tap().onEnd(() => {
     runOnJS(select)();
   });
 
-  const longPress = Gesture.LongPress()
-    .enabled(onToggleFloating !== undefined)
-    .minDuration(350)
-    .onStart(() => {
-      runOnJS(toggleFloating)();
-    });
-
-  const gesture = Gesture.Race(pan, longPress, tap);
+  // Double-tap must win over single-tap; the hold-to-drag pan races alongside.
+  const gesture = Gesture.Race(pan, Gesture.Exclusive(doubleTap, tap));
 
   const style = useAnimatedStyle(() => ({
     left: posX.value - touchSize / 2,
@@ -147,10 +173,16 @@ export function LimbMarker({
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View
-        style={[styles.touch, { width: touchSize, height: touchSize }, style]}
+        style={[
+          styles.touch,
+          // Non-current placements are dimmed, but a tapped marker un-dims so it
+          // stays legible and easy to drag.
+          { width: touchSize, height: touchSize, opacity: bubbleOpacity * (muted && !selected ? 0.4 : 1) },
+          style,
+        ]}
         accessibilityRole="button"
-        accessibilityLabel={`${LIMB_NAME[limb]} marker`}
-        accessibilityHint={floating ? 'Floating; long-press to restore' : 'Long-press to mark floating'}
+        accessibilityLabel={`${LIMB_NAME[limb]} marker${current ? `, current ${LIMB_NAME[limb].toLowerCase()}` : ''}`}
+        accessibilityHint={floating ? 'Floating; double-tap to restore' : 'Double-tap to mark floating'}
       >
         <Animated.View
           style={[
@@ -160,11 +192,29 @@ export function LimbMarker({
               height: dotSize,
               borderRadius: dotSize / 2,
               backgroundColor: color,
-              borderWidth: selected ? (compact ? 2.5 : 3) : 1.5,
-              opacity: floating ? 0.35 : 1,
+              // Floating markers keep their color but wear a dashed black border.
+              borderColor: floating ? '#000000' : '#FFFFFF',
+              borderStyle: floating ? 'dashed' : 'solid',
+              borderWidth: selected ? (compact ? 2.5 : 3) : floating ? 2 : 1.5,
             },
           ]}
         >
+          {current && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.ring,
+                {
+                  top: -ringGap,
+                  left: -ringGap,
+                  right: -ringGap,
+                  bottom: -ringGap,
+                  borderRadius: dotSize / 2 + ringGap,
+                  borderWidth: ringWidth,
+                },
+              ]}
+            />
+          )}
           <MaterialCommunityIcons
             name={LIMB_ICON[limb]}
             size={iconSize}
@@ -182,7 +232,6 @@ export function LimbMarker({
                   height: badgeSize,
                   borderRadius: badgeSize / 2,
                   borderColor: color,
-                  opacity: floating ? 0.35 : 1,
                 },
               ]}
             >
@@ -207,6 +256,12 @@ const styles = StyleSheet.create({
     borderColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // A bright amber halo, distinct from the white selection border, marking the
+  // limb's latest placement (the current body position).
+  ring: {
+    position: 'absolute',
+    borderColor: '#FFC400',
   },
   flip: {
     transform: [{ scaleX: -1 }],

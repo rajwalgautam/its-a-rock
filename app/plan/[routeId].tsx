@@ -25,6 +25,7 @@ import { PlaybackControls } from '@/components/plan/PlaybackControls';
 import {
   addToFrame,
   appendMove,
+  currentStanceKeys,
   frameStanceAt,
   framesOf,
   fromPlan,
@@ -102,6 +103,8 @@ export default function RoutePlanScreen(): React.JSX.Element {
   const saveMoves = usePlanStore((s) => s.saveMoves);
   const bubbleScale = useSettingsStore((s) => s.bubbleScale);
   const setBubbleScale = useSettingsStore((s) => s.setBubbleScale);
+  const bubbleOpacity = useSettingsStore((s) => s.bubbleOpacity);
+  const setBubbleOpacity = useSettingsStore((s) => s.setBubbleOpacity);
 
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [moves, setMoves] = useState<DraftMove[]>([]);
@@ -333,18 +336,23 @@ export default function RoutePlanScreen(): React.JSX.Element {
       highlighted: moving.has(l),
     }));
   } else {
-    // Collapse every move except the latest (or the one being edited) to a
-    // numbered dot, so earlier markers stop covering the holds underneath.
+    // Markers stay small dots so they barely cover the holds; the sequence
+    // number only appears on the tapped marker. The up-to-four markers of the
+    // current body position (each limb's latest placement) get a stance ring;
+    // superseded placements are dimmed.
+    const stanceKeys = currentStanceKeys(moves);
     markers = moves.map((m, i) => ({
       key: m.key,
       limb: m.limb,
       x: m.x,
       y: m.y,
       color: limbColor(colors, m.limb),
-      badge: i + 1,
-      dot: i !== moves.length - 1 && m.key !== selectedKey,
+      badge: m.key === selectedKey ? i + 1 : null,
+      dot: true,
       groupId: m.groupId,
       floating: m.floating,
+      current: stanceKeys.has(m.key),
+      muted: !stanceKeys.has(m.key),
     }));
   }
 
@@ -373,6 +381,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
           editable={!playing}
           animatedMarkers={playing}
           bubbleScale={bubbleScale}
+          bubbleOpacity={bubbleOpacity}
           selectedKey={playing ? null : selectedKey}
           onPlace={handlePlace}
           onSelectMarker={setSelectedKey}
@@ -423,6 +432,8 @@ export default function RoutePlanScreen(): React.JSX.Element {
           onOpenList={() => setListOpen(true)}
           bubbleScale={bubbleScale}
           onBubbleScaleChange={setBubbleScale}
+          bubbleOpacity={bubbleOpacity}
+          onBubbleOpacityChange={setBubbleOpacity}
           onHelp={() => setHelpOpen(true)}
           onUndo={handleUndo}
           undoDisabled={!canUndo}

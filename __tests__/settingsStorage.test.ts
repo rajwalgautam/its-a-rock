@@ -17,6 +17,7 @@ describe('settingsStorage', () => {
       promptSendVideo: false,
       muteVideosByDefault: false,
       bubbleScale: 1.4,
+      bubbleOpacity: 0.5,
       notesLayout: 'grid',
     });
     expect(await loadSettings()).toEqual({
@@ -25,6 +26,7 @@ describe('settingsStorage', () => {
       promptSendVideo: false,
       muteVideosByDefault: false,
       bubbleScale: 1.4,
+      bubbleOpacity: 0.5,
       notesLayout: 'grid',
     });
   });
@@ -46,5 +48,10 @@ describe('settingsStorage', () => {
   it('clamps an out-of-range bubbleScale to the default', async () => {
     await saveSettings({ ...DEFAULT_SETTINGS, bubbleScale: 0.1 });
     expect((await loadSettings()).bubbleScale).toBe(DEFAULT_SETTINGS.bubbleScale);
+  });
+
+  it('clamps an out-of-range bubbleOpacity to the default', async () => {
+    await saveSettings({ ...DEFAULT_SETTINGS, bubbleOpacity: 2 });
+    expect((await loadSettings()).bubbleOpacity).toBe(DEFAULT_SETTINGS.bubbleOpacity);
   });
 });

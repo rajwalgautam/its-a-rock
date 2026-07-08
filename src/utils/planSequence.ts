@@ -54,6 +54,17 @@ export function toggleFloating(moves: DraftMove[], key: string): DraftMove[] {
   return moves.map((m) => (m.key === key ? { ...m, floating: !m.floating } : m));
 }
 
+/**
+ * The keys of the moves that make up the current body position: for each limb,
+ * the key of its last placement in sequence (at most four). Used to flag the
+ * "current stance" markers while editing.
+ */
+export function currentStanceKeys(moves: DraftMove[]): Set<string> {
+  const latest = new Map<Limb, string>();
+  for (const m of moves) latest.set(m.limb, m.key);
+  return new Set(latest.values());
+}
+
 export function appendMove(moves: DraftMove[], move: DraftMove): DraftMove[] {
   return [...moves, move];
 }

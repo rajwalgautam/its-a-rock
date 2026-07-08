@@ -1,6 +1,7 @@
 import {
   addToFrame,
   appendMove,
+  currentStanceKeys,
   framesOf,
   groupMoves,
   isSeeding,
@@ -97,6 +98,29 @@ describe('toggleFloating', () => {
   it('leaves the list unchanged when the key is absent', () => {
     const base = [move('a'), move('b')];
     expect(toggleFloating(base, 'z').map((m) => m.floating)).toEqual([false, false]);
+  });
+});
+
+describe('currentStanceKeys', () => {
+  it('is empty for an empty plan', () => {
+    expect(currentStanceKeys([]).size).toBe(0);
+  });
+
+  it('returns each limb latest placement key', () => {
+    // LH placed twice; only its second placement counts.
+    const moves = [
+      move('a', 'LH'),
+      move('b', 'RH'),
+      move('c', 'LH'),
+      move('d', 'LF'),
+    ];
+    expect(currentStanceKeys(moves)).toEqual(new Set(['b', 'c', 'd']));
+  });
+
+  it('flags only the limbs that are placed', () => {
+    expect(currentStanceKeys([move('a', 'LH'), move('b', 'RH')])).toEqual(
+      new Set(['a', 'b']),
+    );
   });
 });
 

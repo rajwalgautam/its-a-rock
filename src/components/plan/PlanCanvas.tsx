@@ -30,6 +30,10 @@ export interface CanvasMarker {
   highlighted?: boolean;
   /** Greyed-out "floating" annotation — an optional/uncommitted hold. */
   floating?: boolean;
+  /** This limb's latest placement — flagged as part of the current stance. */
+  current?: boolean;
+  /** Dim the marker (a superseded, non-current placement). */
+  muted?: boolean;
 }
 
 /** Radius (image px) around a marker within which a tap selects rather than places. */
@@ -49,6 +53,8 @@ interface PlanCanvasProps {
   animatedMarkers?: boolean;
   /** Size multiplier for the limb bubbles (user-configurable). */
   bubbleScale?: number;
+  /** Opacity for the limb bubbles/badges (user-configurable transparency). */
+  bubbleOpacity?: number;
   selectedKey?: string | null;
   onPlace?: (norm: Point) => void;
   onSelectMarker?: (key: string) => void;
@@ -69,6 +75,7 @@ export function PlanCanvas({
   editable,
   animatedMarkers = false,
   bubbleScale = 1,
+  bubbleOpacity = 1,
   selectedKey = null,
   onPlace,
   onSelectMarker,
@@ -210,7 +217,10 @@ export function PlanCanvas({
                   animated={animatedMarkers}
                   compact={m.dot}
                   floating={m.floating}
+                  current={m.current}
+                  muted={m.muted}
                   bubbleScale={bubbleScale}
+                  bubbleOpacity={bubbleOpacity}
                   scale={scale}
                   onSelect={() => onSelectMarker?.(m.key)}
                   onCommit={(norm) => onCommitMarker?.(m.key, norm)}

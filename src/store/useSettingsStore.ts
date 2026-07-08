@@ -16,6 +16,7 @@ interface SettingsState extends Settings {
   setPromptSendVideo: (value: boolean) => void;
   setMuteVideosByDefault: (value: boolean) => void;
   setBubbleScale: (value: number) => void;
+  setBubbleOpacity: (value: number) => void;
   setNotesLayout: (value: NotesLayout) => void;
 }
 
@@ -26,6 +27,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   promptSendVideo: DEFAULT_SETTINGS.promptSendVideo,
   muteVideosByDefault: DEFAULT_SETTINGS.muteVideosByDefault,
   bubbleScale: DEFAULT_SETTINGS.bubbleScale,
+  bubbleOpacity: DEFAULT_SETTINGS.bubbleOpacity,
   notesLayout: DEFAULT_SETTINGS.notesLayout,
   isLoaded: false,
 
@@ -64,6 +66,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     void persist(get);
   },
 
+  setBubbleOpacity: (value) => {
+    set({ bubbleOpacity: value });
+    void persist(get);
+  },
+
   setNotesLayout: (value) => {
     set({ notesLayout: value });
     void persist(get);
@@ -78,6 +85,7 @@ function persist(get: () => SettingsState): Promise<void> {
     promptSendVideo,
     muteVideosByDefault,
     bubbleScale,
+    bubbleOpacity,
     notesLayout,
   } = get();
   return saveSettings({
@@ -87,6 +95,7 @@ function persist(get: () => SettingsState): Promise<void> {
     promptSendVideo,
     muteVideosByDefault,
     bubbleScale,
+    bubbleOpacity,
     notesLayout,
   });
 }
