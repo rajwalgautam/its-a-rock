@@ -712,6 +712,9 @@ const styles = StyleSheet.create({
   },
   planBtn: {
     flexDirection: 'row',
+    // Center the icon + label on the main (horizontal) axis; `btn`'s
+    // `alignItems: center` only centers the cross axis once this is a row.
+    justifyContent: 'center',
     gap: SPACING.xs,
   },
   btnText: {
