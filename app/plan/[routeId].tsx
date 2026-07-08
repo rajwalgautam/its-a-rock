@@ -336,9 +336,9 @@ export default function RoutePlanScreen(): React.JSX.Element {
       highlighted: moving.has(l),
     }));
   } else {
-    // The up-to-four markers making up the current body position stay full-size
-    // and get a stance ring; the rest collapse to a numbered dot so they stop
-    // covering the holds underneath.
+    // Markers stay small dots so they barely cover the holds; the sequence
+    // number only appears on the tapped marker. The up-to-four markers of the
+    // current body position (each limb's latest placement) get a stance ring.
     const stanceKeys = currentStanceKeys(moves);
     markers = moves.map((m, i) => ({
       key: m.key,
@@ -346,8 +346,8 @@ export default function RoutePlanScreen(): React.JSX.Element {
       x: m.x,
       y: m.y,
       color: limbColor(colors, m.limb),
-      badge: i + 1,
-      dot: i !== moves.length - 1 && m.key !== selectedKey && !stanceKeys.has(m.key),
+      badge: m.key === selectedKey ? i + 1 : null,
+      dot: true,
       groupId: m.groupId,
       floating: m.floating,
       current: stanceKeys.has(m.key),

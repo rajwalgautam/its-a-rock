@@ -183,8 +183,10 @@ export function LimbMarker({
               height: dotSize,
               borderRadius: dotSize / 2,
               backgroundColor: color,
-              borderWidth: selected ? (compact ? 2.5 : 3) : 1.5,
-              opacity: floating ? 0.35 : 1,
+              // Floating markers keep their color but wear a dashed black border.
+              borderColor: floating ? '#000000' : '#FFFFFF',
+              borderStyle: floating ? 'dashed' : 'solid',
+              borderWidth: selected ? (compact ? 2.5 : 3) : floating ? 2 : 1.5,
             },
           ]}
         >
@@ -221,7 +223,6 @@ export function LimbMarker({
                   height: badgeSize,
                   borderRadius: badgeSize / 2,
                   borderColor: color,
-                  opacity: floating ? 0.35 : 1,
                 },
               ]}
             >
