@@ -17,6 +17,13 @@ breakdown.
 | ----------- | ------- |
 | ![My Climbing tab — this-week stats and active projects](assets/screenshot-my-climbing.png) | ![History tab — all climbs with filter & sort](assets/screenshot-history.png) |
 
+### Planning a route
+
+Mark your hands and feet on the climb's photo, sequence the moves, and play the
+beta back move by move.
+
+![Planning a route — marking hands and feet, sequencing moves, and playing the beta back](assets/demo-route-planner.gif)
+
 ## Features
 
 - **Visual, tile-driven log** — the photo of the climb is the primary content.
