@@ -279,7 +279,7 @@ jobs:
           printf '%s\n' "$LINK" > /tmp/release-notes.md
 
       - name: Publish release to its-a-rock
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.create-tag.outputs.release_tag }}
           name: ${{ needs.create-tag.outputs.release_tag }}
