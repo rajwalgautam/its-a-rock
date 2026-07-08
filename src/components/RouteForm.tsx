@@ -20,7 +20,7 @@ import { useRouteStore } from '@/store/useRouteStore';
 import { GradePicker } from '@/components/GradePicker';
 import { MediaGalleryField } from '@/components/MediaGalleryField';
 import { LocationPickerField } from '@/components/LocationPickerField';
-import { NotesEditor, type NoteDraft } from '@/components/NotesEditor';
+import { NotesEditor, emptyDraft, type NoteDraft } from '@/components/NotesEditor';
 import { formatDate } from '@/utils/formatters';
 import { startOfDayMs } from '@/utils/dateUtils';
 import { validateRouteInput } from '@/utils/validators';
@@ -41,6 +41,8 @@ interface RouteFormProps {
    */
   onPersistDraft?: (input: RouteInput) => Promise<RouteWithGym>;
   onCancel?: () => void;
+  /** Append a fresh empty note draft on mount (from the card's "Add note"). */
+  startWithNewNote?: boolean;
 }
 
 interface FormState {
@@ -66,8 +68,13 @@ function notesToDrafts(notes: RouteNote[]): NoteDraft[] {
   }));
 }
 
-function toState(initial?: RouteWithGym, initialMedia?: MediaItem[]): FormState {
+function toState(
+  initial?: RouteWithGym,
+  initialMedia?: MediaItem[],
+  startWithNewNote = false,
+): FormState {
   const lastLocationName = useSettingsStore.getState().lastLocationName;
+  const notes = initial !== undefined ? notesToDrafts(initial.noteEntries) : [];
   return {
     name: initial?.name ?? '',
     gymName: initial?.gym.name ?? (lastLocationName ?? ''),
@@ -77,7 +84,7 @@ function toState(initial?: RouteWithGym, initialMedia?: MediaItem[]): FormState 
         : (initialMedia ?? []),
     grade: initial?.grade ?? null,
     completed: initial?.completed ?? false,
-    notes: initial !== undefined ? notesToDrafts(initial.noteEntries) : [],
+    notes: startWithNewNote ? [...notes, emptyDraft()] : notes,
     startedAt: initial?.startedAt ?? null,
     completedAt: initial?.completedAt ?? null,
   };
@@ -117,6 +124,7 @@ export function RouteForm({
   onSubmit,
   onPersistDraft,
   onCancel,
+  startWithNewNote,
 }: RouteFormProps): React.JSX.Element {
   const { colors } = useTheme();
   const router = useRouter();
@@ -124,7 +132,9 @@ export function RouteForm({
   const getRoute = useRouteStore((s) => s.getRoute);
   const setLastLocationName = useSettingsStore((s) => s.setLastLocationName);
   const promptSendVideo = useSettingsStore((s) => s.promptSendVideo);
-  const [state, setState] = useState<FormState>(() => toState(initial, initialMedia));
+  const [state, setState] = useState<FormState>(() =>
+    toState(initial, initialMedia, startWithNewNote),
+  );
   const [errors, setErrors] = useState<ReturnType<typeof validateRouteInput>['errors']>({});
   const [saving, setSaving] = useState(false);
   const [datePickerField, setDatePickerField] = useState<'started' | 'completed' | null>(null);

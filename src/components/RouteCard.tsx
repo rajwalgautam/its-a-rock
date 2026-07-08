@@ -23,6 +23,7 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
   const router = useRouter();
   const editRoute = useRouteStore((s) => s.editRoute);
   const [editing, setEditing] = useState(false);
+  const [addingNote, setAddingNote] = useState(false);
   const [current, setCurrent] = useState(route);
   const [viewerOpen, setViewerOpen] = useState(false);
 
@@ -38,7 +39,13 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
     const updated = await editRoute(current.id, input);
     setCurrent(updated);
     setEditing(false);
+    setAddingNote(false);
     onSaved?.(updated);
+  }
+
+  function startEditing(withNewNote: boolean): void {
+    setAddingNote(withNewNote);
+    setEditing(true);
   }
 
   /** Persist edits without leaving the form (used to anchor a note's plan). */
@@ -57,7 +64,11 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
         submitLabel="Save"
         onSubmit={handleSave}
         onPersistDraft={persistDraft}
-        onCancel={() => setEditing(false)}
+        onCancel={() => {
+          setEditing(false);
+          setAddingNote(false);
+        }}
+        startWithNewNote={addingNote}
       />
     );
   }
@@ -130,11 +141,21 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
         <DetailRow icon="flag-outline" label="Sent" value={formatDate(current.completedAt)} />
       )}
       <Pressable
-        onPress={() => setEditing(true)}
+        onPress={() => startEditing(false)}
         style={[styles.editBtn, { borderColor: colors.border }]}
       >
         <Ionicons name="create-outline" size={18} color={colors.primary} />
         <Text style={[styles.editText, { color: colors.primary }]}>Edit</Text>
+      </Pressable>
+
+      <Pressable
+        onPress={() => startEditing(true)}
+        style={[styles.editBtn, { borderColor: colors.border }]}
+        accessibilityRole="button"
+        accessibilityLabel="Add note"
+      >
+        <Ionicons name="add" size={18} color={colors.primary} />
+        <Text style={[styles.editText, { color: colors.primary }]}>Add note</Text>
       </Pressable>
 
       <NotesSection notes={current.noteEntries} onPressNote={openNotePlan} />

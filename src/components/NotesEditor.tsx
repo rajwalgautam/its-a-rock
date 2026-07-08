@@ -38,7 +38,7 @@ function freshKey(): string {
 }
 
 /** Build an empty draft. */
-function emptyDraft(): NoteDraft {
+export function emptyDraft(): NoteDraft {
   return { id: null, key: freshKey(), body: '', mediaUri: null, mediaType: null, hasPlan: false };
 }
 
