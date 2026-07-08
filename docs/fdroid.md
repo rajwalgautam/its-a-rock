@@ -18,7 +18,7 @@ are the source of truth; this is the app-specific mapping.
 | Author does not oppose inclusion | ✅ | Author is the repo owner. |
 | Fastlane/Triple-T metadata in repo | ✅ | [`fastlane/metadata/android/en-US/`](../fastlane/metadata/android/en-US). |
 | No self-update / sideload anti-feature | ✅ (F-Droid flavor) | Updater stripped via build flag — see below. |
-| Monotonic, unique `versionCode` per release | ⚠️ **TODO** | See "Version code" below — required before submitting. |
+| Monotonic, unique `versionCode` per release | ✅ | Release workflow commits version + `versionCode` onto each tag — see below. |
 
 ## The F-Droid build flavor
 
@@ -54,16 +54,17 @@ EXPO_PUBLIC_ENABLE_INAPP_UPDATES=false npx expo prebuild -p android --no-install
 cd android && ./gradlew assembleRelease
 ```
 
-## Version code — must fix before submitting
+## Version code
 
 F-Droid requires each published APK to have a **unique, monotonically increasing
-`versionCode`**. Today the app never sets `expo.android.versionCode`, so every
-Expo build produces `versionCode 1`. The GitHub updater compares `versionName`
-strings so it never noticed, but F-Droid cannot accept it.
+`versionCode`**, and it must be correct **at the git tag** (F-Droid builds from
+the tag, not from CI).
 
-Pick a scheme and set `expo.android.versionCode` (ideally in the release
-workflow next to where it sets `expo.version`, so it is derived from the tag).
-A simple, collision-free mapping from `vMAJOR.MINOR.PATCH`:
+The release workflow handles this: for a normal release it derives both values
+from the dispatched tag and **commits them onto the tagged commit** — so checking
+out `v1.5.2` yields an `app.json` with `version: "1.5.2"` and
+`android.versionCode: 10502`. See
+[`docs/releasing.md`](releasing.md#versioning). The scheme is:
 
 ```
 versionCode = MAJOR * 10000 + MINOR * 100 + PATCH
@@ -72,7 +73,11 @@ versionCode = MAJOR * 10000 + MINOR * 100 + PATCH
 
 The [recipe](../fdroid/com.itsarock.app.yml) and the fastlane changelog file
 ([`changelogs/10502.txt`](../fastlane/metadata/android/en-US/changelogs/10502.txt))
-already assume this scheme — keep them in sync with whatever you choose.
+match this scheme.
+
+> **Note on existing tags:** tags released *before* this change (≤ v1.5.x) were
+> built with `versionCode 1` and a stale `versionName`. Point the recipe's first
+> `Builds` entry at the first tag cut *after* this lands.
 
 ## The build recipe
 

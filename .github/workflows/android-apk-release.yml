@@ -126,10 +126,32 @@ jobs:
           fi
           echo "Found changelog ${FILE}"
 
-      - name: Create and push tag
+      - name: Bump app.json version and create tag
         if: steps.resolve.outputs.is_rerelease == 'false'
         run: |
           VERSION="${{ steps.resolve.outputs.version }}"
+          BARE="${VERSION#v}"
+
+          # Commit the version + versionCode into app.json so the *tag* carries
+          # the real values. External builders (e.g. F-Droid) build from the tag
+          # and need this; main stays at the 0.0.0 placeholder — the bump commit
+          # is reachable only via the tag, not pushed to any branch.
+          node -e "
+            const fs = require('fs');
+            const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            app.expo.version = '${BARE}';
+            const [maj, min, pat] = '${BARE}'.split('.').map(Number);
+            app.expo.android = {
+              ...(app.expo.android || {}),
+              versionCode: maj * 10000 + min * 100 + pat,
+            };
+            fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
+          "
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.json
+          git commit -m "chore(release): ${VERSION} [skip ci]"
 
           if git ls-remote --tags origin "refs/tags/${VERSION}" | grep -q "refs/tags/${VERSION}"; then
             git push origin ":refs/tags/${VERSION}"
@@ -137,7 +159,7 @@ jobs:
           fi
           git tag -f "${VERSION}"
           git push origin "${VERSION}"
-          echo "Created and pushed tag ${VERSION}"
+          echo "Created and pushed tag ${VERSION} with version ${BARE}"
 
   # ---------------------------------------------------------------------------
   # Manual dispatch only: build APK and publish release (runs after create-tag)
@@ -187,15 +209,23 @@ jobs:
 
       - name: Set app.json version for build
         run: |
+          # Belt-and-suspenders: the tag created above already carries the bump,
+          # but re-releasing an OLD tag (created before that step existed) would
+          # not, so inject version + versionCode here too. Idempotent for new tags.
           VERSION="${{ needs.create-tag.outputs.version }}"
           BARE="${VERSION#v}"
           node -e "
             const fs = require('fs');
             const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
             app.expo.version = '${BARE}';
+            const [maj, min, pat] = '${BARE}'.split('.').map(Number);
+            app.expo.android = {
+              ...(app.expo.android || {}),
+              versionCode: maj * 10000 + min * 100 + pat,
+            };
             fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
           "
-          echo "Set app.json version to ${BARE}"
+          echo "Set app.json version to ${BARE} (versionCode from ${BARE})"
 
       - name: Cache Expo prebuild
         uses: actions/cache@v4

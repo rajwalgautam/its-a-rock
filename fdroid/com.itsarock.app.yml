@@ -23,9 +23,9 @@ Repo: https://github.com/rajwalgautam/its-a-rock.git
 
 Builds:
   - versionName: 1.5.2
-    # versionCode MUST be unique and monotonically increasing across releases.
-    # The app does not currently set expo.android.versionCode (it defaults to 1
-    # on every build) — this must be fixed before submission. See docs/fdroid.md.
+    # versionCode = MAJOR*10000 + MINOR*100 + PATCH, committed onto the tag by the
+    # release workflow. Point this at the first tag cut AFTER the workflow change
+    # landed; earlier tags were built with versionCode 1. See docs/fdroid.md.
     versionCode: 10502
     commit: v1.5.2
     sudo:
