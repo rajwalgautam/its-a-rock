@@ -22,7 +22,7 @@ breakdown.
 Mark your hands and feet on the climb's photo, sequence the moves, and play the
 beta back move by move.
 
-<video src="https://github.com/rajwalgautam/its-a-rock/raw/main/assets/demo-route-planner.mp4" width="300" controls muted></video>
+<video src="https://github.com/rajwalgautam/its-a-rock/releases/download/v1.5.2/demo-route-planner.mp4" width="300" controls muted></video>
 
 ## Features
 
