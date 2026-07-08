@@ -12,7 +12,8 @@ export interface ValidationResult {
 /**
  * Validate a RouteInput. Per the blueprint, every field is optional except the
  * gym — a route must belong to a gym/location. A provided grade must be a valid
- * V-scale grade, and if both dates are present the start can't be after the end.
+ * grade in a supported system (V-scale, YDS, or French), and if both dates are
+ * present the start can't be after the end.
  */
 export function validateRouteInput(input: RouteInput): ValidationResult {
   const errors: ValidationResult['errors'] = {};
@@ -30,7 +31,7 @@ export function validateRouteInput(input: RouteInput): ValidationResult {
     errors.grade =
       parseGradeRange(input.grade) !== null
         ? 'Range start must be at or below the end.'
-        : 'Not a valid V-scale grade.';
+        : 'Not a valid grade.';
   }
 
   if (

@@ -18,6 +18,12 @@ export type GradeBase =
 
 export type GradeModifier = '' | '+' | '-';
 
+/**
+ * Which grading system the grade picker presents. The stored grade is always a
+ * plain string; this only drives which scale of options the user picks from.
+ */
+export type GradeSystem = 'V' | 'YDS' | 'French';
+
 export interface Gym {
   readonly id: number;
   name: string;
@@ -232,6 +238,8 @@ export interface WeeklyStats {
 // ---- Settings / theme ----
 
 export type ThemeMode = 'light' | 'dark' | 'system';
+
+// GradeSystem is declared near the grade types above.
 
 /** Tiles per row in the route grid. */
 export type ColumnDensity = 1 | 2 | 3 | 4;

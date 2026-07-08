@@ -1,4 +1,4 @@
-import { GRADE_BASES, compareGrades, parseGrade, parseGradeRange } from '@/utils/gradeUtils';
+import { compareGrades, gradeRungIndex } from '@/utils/gradeUtils';
 import type { HistoryFilters, RouteWithGym } from '@/types';
 
 export const DEFAULT_HISTORY_FILTERS: HistoryFilters = {
@@ -19,26 +19,13 @@ export function hasActiveFilters(f: HistoryFilters): boolean {
   );
 }
 
-/**
- * Index of a grade's base on the V-scale (modifiers ignored), or -1 when the
- * grade is missing/unparseable. Ranges use their lower bound. Used so grade
- * filtering treats e.g. V4-, V4 and V4+ as the same rung.
- */
-function baseIndexOf(grade: string | null | undefined): number {
-  const single = parseGrade(grade);
-  if (single !== null) return GRADE_BASES.indexOf(single.base);
-  const range = parseGradeRange(grade);
-  if (range !== null) return GRADE_BASES.indexOf(range.min.base);
-  return -1;
-}
-
 /** Apply completion/gym/grade filters and the chosen sort. Pure; returns a copy. */
 export function applyHistoryFilters(
   routes: RouteWithGym[],
   f: HistoryFilters,
 ): RouteWithGym[] {
-  const minIndex = baseIndexOf(f.gradeMin);
-  const maxIndex = baseIndexOf(f.gradeMax);
+  const minIndex = gradeRungIndex(f.gradeMin);
+  const maxIndex = gradeRungIndex(f.gradeMax);
 
   const filtered = routes.filter((r) => {
     if (f.completion === 'completed' && !r.completed) return false;
@@ -46,7 +33,7 @@ export function applyHistoryFilters(
     if (f.gymId !== null && r.gymId !== f.gymId) return false;
 
     if (f.gradeMin !== null || f.gradeMax !== null) {
-      const idx = baseIndexOf(r.grade);
+      const idx = gradeRungIndex(r.grade);
       if (idx < 0) return false; // ungraded climbs drop out of grade filtering
       if (f.gradeMin !== null && idx < minIndex) return false;
       if (f.gradeMax !== null && idx > maxIndex) return false;

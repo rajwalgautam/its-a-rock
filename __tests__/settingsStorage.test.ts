@@ -19,6 +19,7 @@ describe('settingsStorage', () => {
       bubbleScale: 1.4,
       bubbleOpacity: 0.5,
       notesLayout: 'grid',
+      gradeSystem: 'French',
     });
     expect(await loadSettings()).toEqual({
       themeMode: 'dark',
@@ -28,6 +29,7 @@ describe('settingsStorage', () => {
       bubbleScale: 1.4,
       bubbleOpacity: 0.5,
       notesLayout: 'grid',
+      gradeSystem: 'French',
     });
   });
 

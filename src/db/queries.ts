@@ -685,6 +685,63 @@ export async function deletePlan(id: number): Promise<void> {
   await db.runAsync('DELETE FROM route_plans WHERE id = ?', [id]);
 }
 
+/**
+ * Duplicate a note and its plan so a climber can try a variation without losing
+ * the original. Copies the source note (same photo, body suffixed "(copy)") to a
+ * new note at the end of the list, then deep-copies its plan's moves onto a fresh
+ * plan anchored to the new note. Returns the new note's id. No-op-safe: a note
+ * with no plan simply yields a copied note.
+ */
+export async function duplicateNotePlan(routeId: number, noteId: number): Promise<number> {
+  const db = getDatabase();
+  const now = Date.now();
+  let newNoteId = 0;
+  await db.withTransactionAsync(async () => {
+    const src = await db.getFirstAsync<RouteNoteRow>('SELECT * FROM route_notes WHERE id = ?', [
+      noteId,
+    ]);
+    if (src === null) throw new Error(`Note ${noteId} not found`);
+    const maxRow = await db.getFirstAsync<{ p: number | null }>(
+      'SELECT MAX(position) AS p FROM route_notes WHERE route_id = ?',
+      [routeId],
+    );
+    const position = (maxRow?.p ?? -1) + 1;
+    const body =
+      src.body !== null && src.body.trim().length > 0 ? `${src.body} (copy)` : src.body;
+    const noteRes = await db.runAsync(
+      `INSERT INTO route_notes (route_id, media_id, body, position, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [routeId, src.media_id, body, position, now, now],
+    );
+    newNoteId = noteRes.lastInsertRowId;
+
+    const srcPlan = await db.getFirstAsync<RoutePlanRow>(
+      'SELECT * FROM route_plans WHERE note_id = ? ORDER BY id ASC LIMIT 1',
+      [noteId],
+    );
+    if (srcPlan !== null) {
+      const planRes = await db.runAsync(
+        `INSERT INTO route_plans (route_id, note_id, media_id, name, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [routeId, newNoteId, srcPlan.media_id, srcPlan.name, now, now],
+      );
+      const newPlanId = planRes.lastInsertRowId;
+      const moves = await db.getAllAsync<PlanMoveRow>(
+        'SELECT * FROM plan_moves WHERE plan_id = ? ORDER BY sequence ASC, id ASC',
+        [srcPlan.id],
+      );
+      for (const mv of moves) {
+        await db.runAsync(
+          `INSERT INTO plan_moves (plan_id, limb, hold_id, x, y, group_id, floating, sequence, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [newPlanId, mv.limb, mv.hold_id, mv.x, mv.y, mv.group_id, mv.floating, mv.sequence, now],
+        );
+      }
+    }
+  });
+  return newNoteId;
+}
+
 /** Best-effort lowercase file extension from a URI, defaulting to `jpg`. */
 function fileExtension(uri: string): string {
   const withoutQuery = uri.split('?')[0] ?? uri;

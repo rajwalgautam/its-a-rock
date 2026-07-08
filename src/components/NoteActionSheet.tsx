@@ -12,6 +12,8 @@ interface NoteActionSheetProps {
   onEditNote: (note: RouteNote) => void;
   /** Open the planner for the note's photo. */
   onEditPlan: (note: RouteNote) => void;
+  /** Copy the note + its plan into a new note (to try a variation). */
+  onDuplicatePlan: (note: RouteNote) => void;
 }
 
 /**
@@ -23,9 +25,11 @@ export function NoteActionSheet({
   onClose,
   onEditNote,
   onEditPlan,
+  onDuplicatePlan,
 }: NoteActionSheetProps): React.JSX.Element {
   const { colors } = useTheme();
   const canPlan = note?.media != null && note.media.type === 'photo';
+  const hasPlan = note?.hasPlan === true;
 
   return (
     <Modal visible={note !== null} transparent animationType="fade" onRequestClose={onClose}>
@@ -42,9 +46,18 @@ export function NoteActionSheet({
         {canPlan && (
           <Row
             icon="footsteps-outline"
-            label={note?.hasPlan === true ? 'Edit plan' : 'Add plan'}
+            label={hasPlan ? 'Edit plan' : 'Add plan'}
             onPress={() => {
               if (note !== null) onEditPlan(note);
+            }}
+          />
+        )}
+        {canPlan && hasPlan && (
+          <Row
+            icon="copy-outline"
+            label="Duplicate plan"
+            onPress={() => {
+              if (note !== null) onDuplicatePlan(note);
             }}
           />
         )}

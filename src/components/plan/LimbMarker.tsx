@@ -44,6 +44,12 @@ interface LimbMarkerProps {
   current?: boolean;
   /** Dim the marker (a superseded, non-current placement). */
   muted?: boolean;
+  /**
+   * When false, the marker ignores touches entirely (no select/drag) and lets
+   * them fall through to the canvas — so a tap near a superseded move places a
+   * new overlapping one instead of re-selecting the old one. Defaults to true.
+   */
+  interactive?: boolean;
   /** Size multiplier for the visible dot (user-configurable bubble size). */
   bubbleScale?: number;
   /** Opacity multiplier for the dot/badge (user-configurable transparency). */
@@ -83,6 +89,7 @@ export function LimbMarker({
   floating = false,
   current = false,
   muted = false,
+  interactive = true,
   bubbleScale = 1,
   bubbleOpacity = 1,
   scale,
@@ -136,7 +143,7 @@ export function LimbMarker({
   // one-finger canvas gestures don't nudge it. The hold "lifts" it, then the
   // finger drags it.
   const pan = Gesture.Pan()
-    .enabled(draggable)
+    .enabled(draggable && interactive)
     .activateAfterLongPress(300)
     .onStart(() => {
       runOnJS(liftHaptic)();
@@ -151,16 +158,18 @@ export function LimbMarker({
     });
 
   const doubleTap = Gesture.Tap()
-    .enabled(onToggleFloating !== undefined)
+    .enabled(onToggleFloating !== undefined && interactive)
     .numberOfTaps(2)
     .maxDistance(20)
     .onEnd(() => {
       runOnJS(toggleFloating)();
     });
 
-  const tap = Gesture.Tap().onEnd(() => {
-    runOnJS(select)();
-  });
+  const tap = Gesture.Tap()
+    .enabled(interactive)
+    .onEnd(() => {
+      runOnJS(select)();
+    });
 
   // Double-tap must win over single-tap; the hold-to-drag pan races alongside.
   const gesture = Gesture.Race(pan, Gesture.Exclusive(doubleTap, tap));
@@ -173,6 +182,9 @@ export function LimbMarker({
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View
+        // Superseded markers don't intercept touches, so a tap near one places a
+        // new overlapping move instead of re-selecting the old one.
+        pointerEvents={interactive ? 'auto' : 'none'}
         style={[
           styles.touch,
           // Non-current placements are dimmed, but a tapped marker un-dims so it
@@ -235,7 +247,12 @@ export function LimbMarker({
                 },
               ]}
             >
-              <Text style={[styles.badgeText, { color, fontSize: badgeFont }]}>{badge}</Text>
+              <Text
+                numberOfLines={1}
+                style={[styles.badgeText, { color, fontSize: badgeFont }]}
+              >
+                {badge}
+              </Text>
             </Animated.View>
           )}
         </Animated.View>
@@ -270,11 +287,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -3,
     right: -3,
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
     borderWidth: 1.5,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+    // Grow leftward to fit a two-digit sequence number without clipping.
+    overflow: 'visible',
   },
   badgeText: {
     fontWeight: '800',

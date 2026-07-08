@@ -1,5 +1,12 @@
-import { GRADE_BASES, GRADE_MODIFIERS } from '@/constants/grades';
-import type { GradeBase, GradeModifier } from '@/types';
+import {
+  FRENCH_GRADES,
+  GRADE_BASES,
+  GRADE_MODIFIERS,
+  GRADE_SYSTEMS,
+  V_GRADES,
+  YDS_GRADES,
+} from '@/constants/grades';
+import type { GradeBase, GradeModifier, GradeSystem } from '@/types';
 
 export interface ParsedGrade {
   base: GradeBase;
@@ -30,8 +37,30 @@ export function formatGradeRange(min: string, max: string): string {
   return `${min}-${max}`;
 }
 
+// A single ascending ordering across every system: V tokens, then YDS, then
+// French. Grades are self-identifying (V…, 5.…, bare French tokens), so within
+// a system the order is exact; across systems they group but stay stable. This
+// backs sorting and validation for whichever system a climb was logged in.
+const ALL_GRADES: readonly string[] = [...V_GRADES, ...YDS_GRADES, ...FRENCH_GRADES];
+const GRADE_INDEX = new Map<string, number>(ALL_GRADES.map((g, i) => [g, i]));
+
 function gradeValue(parsed: ParsedGrade): number {
   return GRADE_BASES.indexOf(parsed.base) * 3 + MOD_ORDER[parsed.modifier];
+}
+
+/** True when `grade` is a recognized single token in any supported system. */
+export function isKnownGrade(grade: string | null | undefined): boolean {
+  return grade != null && GRADE_INDEX.has(grade.trim());
+}
+
+/** Which system a serialized single grade belongs to, or null if unrecognized. */
+export function gradeSystemOf(grade: string | null | undefined): GradeSystem | null {
+  if (grade == null) return null;
+  const trimmed = grade.trim();
+  if (parseGrade(trimmed) !== null) return 'V';
+  if ((YDS_GRADES as readonly string[]).includes(trimmed)) return 'YDS';
+  if ((FRENCH_GRADES as readonly string[]).includes(trimmed)) return 'French';
+  return null;
 }
 
 /**
@@ -69,24 +98,27 @@ export function isGradeRange(grade: string | null | undefined): boolean {
 }
 
 /**
- * Accept either a valid single grade or a valid range whose start is at or
- * below its end. Used by form validation.
+ * Accept a valid single grade in any supported system, or a V-scale range whose
+ * start is at or below its end. Used by form validation. (Ranges are a V-scale
+ * feature only; YDS/French grades are logged as a single value.)
  */
 export function isValidGradeOrRange(grade: string | null | undefined): boolean {
-  if (parseGrade(grade) !== null) return true;
+  if (isKnownGrade(grade)) return true;
   const range = parseGradeRange(grade);
   return range !== null && gradeValue(range.min) <= gradeValue(range.max);
 }
 
 /**
- * A monotonic sort value for a grade so that V4- < V4 < V4+ < V5-. Ranges sort
- * by their lower bound. Unknown / unparseable grades sort below everything (-1).
+ * A monotonic sort value so grades order by difficulty within a system (e.g.
+ * V4- < V4 < V4+ < V5-, or 5.10a < 5.10b). V-scale ranges sort by their lower
+ * bound. Unknown / unparseable grades sort below everything (-1).
  */
 export function gradeSortValue(grade: string | null | undefined): number {
-  const parsed = parseGrade(grade);
-  if (parsed !== null) return gradeValue(parsed);
+  if (grade == null) return -1;
+  const known = GRADE_INDEX.get(grade.trim());
+  if (known !== undefined) return known;
   const range = parseGradeRange(grade);
-  if (range !== null) return gradeValue(range.min);
+  if (range !== null) return GRADE_INDEX.get(`${range.min.base}${range.min.modifier}`) ?? -1;
   return -1;
 }
 
@@ -96,6 +128,34 @@ export function gradeSortValue(grade: string | null | undefined): number {
  */
 export function compareGrades(a: string | null | undefined, b: string | null | undefined): number {
   return gradeSortValue(a) - gradeSortValue(b);
+}
+
+// Ascending "rung" list across all systems, used by grade filtering so a min/max
+// picked in one system compares cleanly against grades logged in that system.
+const ALL_RUNGS: readonly string[] = [
+  ...GRADE_SYSTEMS.V.rungs,
+  ...GRADE_SYSTEMS.YDS.rungs,
+  ...GRADE_SYSTEMS.French.rungs,
+];
+const RUNG_INDEX = new Map<string, number>(ALL_RUNGS.map((g, i) => [g, i]));
+
+/** The ordered rung labels to show as min/max grade chips for a system. */
+export function gradeRungs(system: GradeSystem): readonly string[] {
+  return GRADE_SYSTEMS[system].rungs;
+}
+
+/**
+ * Index of a grade's rung on the global rung list (V modifiers folded onto their
+ * base), or -1 when missing/unparseable. V ranges use their lower bound. Used so
+ * grade filtering treats e.g. V4-, V4 and V4+ as the same rung.
+ */
+export function gradeRungIndex(grade: string | null | undefined): number {
+  const single = parseGrade(grade);
+  if (single !== null) return RUNG_INDEX.get(single.base) ?? -1;
+  const range = parseGradeRange(grade);
+  if (range !== null) return RUNG_INDEX.get(range.min.base) ?? -1;
+  if (grade == null) return -1;
+  return RUNG_INDEX.get(grade.trim()) ?? -1;
 }
 
 export { GRADE_BASES, GRADE_MODIFIERS };

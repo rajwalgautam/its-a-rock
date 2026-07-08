@@ -1,0 +1,5 @@
+Plan route button — plan straight from the main photo; the finished plan becomes
+a note you can add text to. Overlapping moves are easier to place: taps near old
+moves now drop a new one instead of selecting the old, and two-digit move numbers
+no longer clip. Duplicate a plan to try a variation. New Grades setting logs
+climbs in V-scale, YDS, or French.

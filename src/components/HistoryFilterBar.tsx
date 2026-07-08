@@ -3,7 +3,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
-import { GRADE_BASES } from '@/utils/gradeUtils';
+import { useSettingsStore } from '@/store/useSettingsStore';
+import { gradeRungs } from '@/utils/gradeUtils';
 import { DEFAULT_HISTORY_FILTERS, hasActiveFilters } from '@/utils/historyFilters';
 import type {
   Gym,
@@ -148,14 +149,15 @@ function GradeChips({
   onSelect: (grade: string | null) => void;
   colors: ReturnType<typeof useTheme>['colors'];
 }): React.JSX.Element {
+  const gradeSystem = useSettingsStore((s) => s.gradeSystem);
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-      {GRADE_BASES.map((base) => (
+      {gradeRungs(gradeSystem).map((rung) => (
         <Chip
-          key={base}
-          label={base}
-          active={selected === base}
-          onPress={() => onSelect(selected === base ? null : base)}
+          key={rung}
+          label={rung}
+          active={selected === rung}
+          onPress={() => onSelect(selected === rung ? null : rung)}
           colors={colors}
         />
       ))}

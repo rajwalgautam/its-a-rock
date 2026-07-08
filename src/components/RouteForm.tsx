@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -240,6 +241,48 @@ export function RouteForm({
     }
   }
 
+  /**
+   * Plan a route straight from the main photo: persist the draft, spin up a new
+   * photo note anchored to the cover shot, and open the planner on it. The note
+   * then shows up in the list where the user can add text to it.
+   */
+  async function handlePlanRoute(): Promise<void> {
+    if (onPersistDraft === undefined) return;
+    const cover = coverItem(state.media);
+    if (cover === null) {
+      Alert.alert(
+        'Add a photo first',
+        'Routes are planned on a climb photo. Add one under “Photos & videos”, then tap Plan route.',
+      );
+      return;
+    }
+    const input = toInput(state, { dropEmpty: false });
+    const result = validateRouteInput(input);
+    if (!result.valid) {
+      setErrors(result.errors);
+      return;
+    }
+    setErrors({});
+    // Append a fresh photo note anchored to the cover shot; it carries the plan.
+    input.noteEntries = [...(input.noteEntries ?? []), { id: null, body: null, mediaUri: cover.uri }];
+    setSaving(true);
+    try {
+      if (state.gymName.length > 0) setLastLocationName(state.gymName);
+      const saved = await onPersistDraft(input);
+      syncFromRoute(saved);
+      // The plan note is the last one persisted; resolve its id to open it.
+      const note = saved.noteEntries[saved.noteEntries.length - 1];
+      if (note === undefined || note.mediaId === null) return;
+      pendingReload.current = true;
+      router.push({
+        pathname: '/plan/[routeId]',
+        params: { routeId: String(saved.id), noteId: String(note.id) },
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   /** Toggling "sent" stamps/clears the send date when it isn't set by hand. */
   function toggleCompleted(value: boolean): void {
     patch({
@@ -352,6 +395,18 @@ export function RouteForm({
             style={[styles.btn, styles.secondaryBtn, { borderColor: colors.border }]}
           >
             <Text style={[styles.btnText, { color: colors.textSecondary }]}>Cancel</Text>
+          </Pressable>
+        )}
+        {onPersistDraft !== undefined && (
+          <Pressable
+            onPress={() => void handlePlanRoute()}
+            disabled={saving}
+            style={[styles.btn, styles.secondaryBtn, styles.planBtn, { borderColor: colors.primary, opacity: saving ? 0.6 : 1 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Plan route"
+          >
+            <Ionicons name="footsteps-outline" size={16} color={colors.primary} />
+            <Text style={[styles.btnText, { color: colors.primary }]}>Plan route</Text>
           </Pressable>
         )}
         <Pressable
@@ -654,6 +709,10 @@ const styles = StyleSheet.create({
   },
   secondaryBtn: {
     borderWidth: 1,
+  },
+  planBtn: {
+    flexDirection: 'row',
+    gap: SPACING.xs,
   },
   btnText: {
     fontSize: FONT_SIZE.md,

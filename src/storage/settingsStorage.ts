@@ -7,7 +7,7 @@ import {
   MIN_BUBBLE_OPACITY,
   MIN_BUBBLE_SCALE,
 } from '@/constants/plan';
-import type { ColumnDensity, NotesLayout, ThemeMode } from '@/types';
+import type { ColumnDensity, GradeSystem, NotesLayout, ThemeMode } from '@/types';
 
 const SETTINGS_KEY = '@itsarock/settings';
 
@@ -25,6 +25,8 @@ export interface Settings {
   bubbleOpacity: number;
   /** How a climb's notes are laid out on the detail card. */
   notesLayout: NotesLayout;
+  /** Which grading system the grade picker presents (default V-scale). */
+  gradeSystem: GradeSystem;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -36,11 +38,13 @@ export const DEFAULT_SETTINGS: Settings = {
   bubbleScale: DEFAULT_BUBBLE_SCALE,
   bubbleOpacity: DEFAULT_BUBBLE_OPACITY,
   notesLayout: 'rows',
+  gradeSystem: 'V',
 };
 
 const VALID_MODES: ThemeMode[] = ['light', 'dark', 'system'];
 const VALID_DENSITIES: ColumnDensity[] = [1, 2, 3, 4];
 const VALID_NOTES_LAYOUTS: NotesLayout[] = ['rows', 'grid'];
+const VALID_GRADE_SYSTEMS: GradeSystem[] = ['V', 'YDS', 'French'];
 
 function validBubbleScale(value: unknown): number {
   return typeof value === 'number' &&
@@ -85,6 +89,9 @@ export async function loadSettings(): Promise<Settings> {
     notesLayout: VALID_NOTES_LAYOUTS.includes(parsed.notesLayout as NotesLayout)
       ? (parsed.notesLayout as NotesLayout)
       : DEFAULT_SETTINGS.notesLayout,
+    gradeSystem: VALID_GRADE_SYSTEMS.includes(parsed.gradeSystem as GradeSystem)
+      ? (parsed.gradeSystem as GradeSystem)
+      : DEFAULT_SETTINGS.gradeSystem,
   };
 }
 
