@@ -42,6 +42,8 @@ interface LimbMarkerProps {
   floating?: boolean;
   /** This limb's latest placement — draw a "current stance" ring. */
   current?: boolean;
+  /** Dim the marker (a superseded, non-current placement). */
+  muted?: boolean;
   /** Size multiplier for the visible dot (user-configurable bubble size). */
   bubbleScale?: number;
   /** Opacity multiplier for the dot/badge (user-configurable transparency). */
@@ -80,6 +82,7 @@ export function LimbMarker({
   compact = false,
   floating = false,
   current = false,
+  muted = false,
   bubbleScale = 1,
   bubbleOpacity = 1,
   scale,
@@ -170,7 +173,13 @@ export function LimbMarker({
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View
-        style={[styles.touch, { width: touchSize, height: touchSize, opacity: bubbleOpacity }, style]}
+        style={[
+          styles.touch,
+          // Non-current placements are dimmed, but a tapped marker un-dims so it
+          // stays legible and easy to drag.
+          { width: touchSize, height: touchSize, opacity: bubbleOpacity * (muted && !selected ? 0.4 : 1) },
+          style,
+        ]}
         accessibilityRole="button"
         accessibilityLabel={`${LIMB_NAME[limb]} marker${current ? `, current ${LIMB_NAME[limb].toLowerCase()}` : ''}`}
         accessibilityHint={floating ? 'Floating; double-tap to restore' : 'Double-tap to mark floating'}

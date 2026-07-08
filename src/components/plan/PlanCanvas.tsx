@@ -32,6 +32,8 @@ export interface CanvasMarker {
   floating?: boolean;
   /** This limb's latest placement — flagged as part of the current stance. */
   current?: boolean;
+  /** Dim the marker (a superseded, non-current placement). */
+  muted?: boolean;
 }
 
 /** Radius (image px) around a marker within which a tap selects rather than places. */
@@ -216,6 +218,7 @@ export function PlanCanvas({
                   compact={m.dot}
                   floating={m.floating}
                   current={m.current}
+                  muted={m.muted}
                   bubbleScale={bubbleScale}
                   bubbleOpacity={bubbleOpacity}
                   scale={scale}

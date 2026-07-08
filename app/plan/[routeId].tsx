@@ -338,7 +338,8 @@ export default function RoutePlanScreen(): React.JSX.Element {
   } else {
     // Markers stay small dots so they barely cover the holds; the sequence
     // number only appears on the tapped marker. The up-to-four markers of the
-    // current body position (each limb's latest placement) get a stance ring.
+    // current body position (each limb's latest placement) get a stance ring;
+    // superseded placements are dimmed.
     const stanceKeys = currentStanceKeys(moves);
     markers = moves.map((m, i) => ({
       key: m.key,
@@ -351,6 +352,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
       groupId: m.groupId,
       floating: m.floating,
       current: stanceKeys.has(m.key),
+      muted: !stanceKeys.has(m.key),
     }));
   }
 
