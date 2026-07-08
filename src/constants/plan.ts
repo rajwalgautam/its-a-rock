@@ -24,3 +24,30 @@ export function stepBubbleScale(value: number, dir: -1 | 1): number {
   const next = Math.max(0, Math.min(BUBBLE_SCALES.length - 1, i + dir));
   return BUBBLE_SCALES[next]!;
 }
+
+/**
+ * Discrete opacities the user can step through for the limb bubbles/badges, as
+ * a fraction (1 = fully opaque). Lower values make the markers more transparent
+ * so the holds underneath show through.
+ */
+export const BUBBLE_OPACITIES = [0.35, 0.5, 0.65, 0.8, 1] as const;
+
+export const DEFAULT_BUBBLE_OPACITY = 1;
+export const MIN_BUBBLE_OPACITY = BUBBLE_OPACITIES[0];
+export const MAX_BUBBLE_OPACITY = BUBBLE_OPACITIES[BUBBLE_OPACITIES.length - 1];
+
+/** Snap an arbitrary opacity to the nearest allowed value. */
+export function nearestBubbleOpacity(value: number): number {
+  return BUBBLE_OPACITIES.reduce((best, o) =>
+    Math.abs(o - value) < Math.abs(best - value) ? o : best,
+  );
+}
+
+/** Step to the adjacent opacity; `dir` is -1 (more transparent) or +1 (more opaque). */
+export function stepBubbleOpacity(value: number, dir: -1 | 1): number {
+  const i = BUBBLE_OPACITIES.indexOf(
+    nearestBubbleOpacity(value) as (typeof BUBBLE_OPACITIES)[number],
+  );
+  const next = Math.max(0, Math.min(BUBBLE_OPACITIES.length - 1, i + dir));
+  return BUBBLE_OPACITIES[next]!;
+}

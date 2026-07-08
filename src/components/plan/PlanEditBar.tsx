@@ -3,9 +3,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import {
+  MAX_BUBBLE_OPACITY,
   MAX_BUBBLE_SCALE,
+  MIN_BUBBLE_OPACITY,
   MIN_BUBBLE_SCALE,
+  nearestBubbleOpacity,
   nearestBubbleScale,
+  stepBubbleOpacity,
   stepBubbleScale,
 } from '@/constants/plan';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -28,6 +32,8 @@ interface PlanEditBarProps {
   onOpenList: () => void;
   bubbleScale: number;
   onBubbleScaleChange: (value: number) => void;
+  bubbleOpacity: number;
+  onBubbleOpacityChange: (value: number) => void;
   onHelp: () => void;
   onUndo: () => void;
   undoDisabled: boolean;
@@ -49,6 +55,8 @@ export function PlanEditBar({
   onOpenList,
   bubbleScale,
   onBubbleScaleChange,
+  bubbleOpacity,
+  onBubbleOpacityChange,
   onHelp,
   onUndo,
   undoDisabled,
@@ -67,7 +75,10 @@ export function PlanEditBar({
         },
       ]}
     >
-      <BubbleSizeControl value={bubbleScale} onChange={onBubbleScaleChange} />
+      <View style={styles.controls}>
+        <BubbleSizeControl value={bubbleScale} onChange={onBubbleScaleChange} />
+        <BubbleOpacityControl value={bubbleOpacity} onChange={onBubbleOpacityChange} />
+      </View>
 
       <LimbSelector active={activeLimb} onChange={onLimbChange} />
 
@@ -151,6 +162,59 @@ export function PlanEditBar({
   );
 }
 
+/** A labeled −/＋ stepper with a live preview dot between the buttons. */
+function StepperControl({
+  label,
+  preview,
+  atMin,
+  atMax,
+  onDecrease,
+  onIncrease,
+  decreaseLabel,
+  increaseLabel,
+}: {
+  label: string;
+  preview: React.ReactNode;
+  atMin: boolean;
+  atMax: boolean;
+  onDecrease: () => void;
+  onIncrease: () => void;
+  decreaseLabel: string;
+  increaseLabel: string;
+}): React.JSX.Element {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.sizeRow}>
+      <Text style={[styles.sizeLabel, { color: colors.textSecondary }]}>{label}</Text>
+      <View style={styles.sizeStepper}>
+        <Pressable
+          onPress={onDecrease}
+          disabled={atMin}
+          hitSlop={8}
+          style={[styles.sizeBtn, { backgroundColor: colors.surfaceAlt, opacity: atMin ? 0.4 : 1 }]}
+          accessibilityRole="button"
+          accessibilityLabel={decreaseLabel}
+        >
+          <Ionicons name="remove" size={18} color={colors.textPrimary} />
+        </Pressable>
+        <View style={styles.preview} accessibilityElementsHidden>
+          {preview}
+        </View>
+        <Pressable
+          onPress={onIncrease}
+          disabled={atMax}
+          hitSlop={8}
+          style={[styles.sizeBtn, { backgroundColor: colors.surfaceAlt, opacity: atMax ? 0.4 : 1 }]}
+          accessibilityRole="button"
+          accessibilityLabel={increaseLabel}
+        >
+          <Ionicons name="add" size={18} color={colors.textPrimary} />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 function BubbleSizeControl({
   value,
   onChange,
@@ -160,52 +224,56 @@ function BubbleSizeControl({
 }): React.JSX.Element {
   const { colors } = useTheme();
   const scale = nearestBubbleScale(value);
-  const atMin = scale <= MIN_BUBBLE_SCALE;
-  const atMax = scale >= MAX_BUBBLE_SCALE;
   const preview = Math.round(10 * scale);
 
   return (
-    <View style={styles.sizeRow}>
-      <Text style={[styles.sizeLabel, { color: colors.textSecondary }]}>Bubble size</Text>
-      <View style={styles.sizeStepper}>
-        <Pressable
-          onPress={() => onChange(stepBubbleScale(scale, -1))}
-          disabled={atMin}
-          hitSlop={8}
-          style={[
-            styles.sizeBtn,
-            { backgroundColor: colors.surfaceAlt, opacity: atMin ? 0.4 : 1 },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Smaller bubbles"
-        >
-          <Ionicons name="remove" size={18} color={colors.textPrimary} />
-        </Pressable>
-        <View style={styles.preview} accessibilityElementsHidden>
-          <View
-            style={{
-              width: preview,
-              height: preview,
-              borderRadius: preview / 2,
-              backgroundColor: colors.primary,
-            }}
-          />
-        </View>
-        <Pressable
-          onPress={() => onChange(stepBubbleScale(scale, 1))}
-          disabled={atMax}
-          hitSlop={8}
-          style={[
-            styles.sizeBtn,
-            { backgroundColor: colors.surfaceAlt, opacity: atMax ? 0.4 : 1 },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Larger bubbles"
-        >
-          <Ionicons name="add" size={18} color={colors.textPrimary} />
-        </Pressable>
-      </View>
-    </View>
+    <StepperControl
+      label="Bubble size"
+      atMin={scale <= MIN_BUBBLE_SCALE}
+      atMax={scale >= MAX_BUBBLE_SCALE}
+      onDecrease={() => onChange(stepBubbleScale(scale, -1))}
+      onIncrease={() => onChange(stepBubbleScale(scale, 1))}
+      decreaseLabel="Smaller bubbles"
+      increaseLabel="Larger bubbles"
+      preview={
+        <View
+          style={{
+            width: preview,
+            height: preview,
+            borderRadius: preview / 2,
+            backgroundColor: colors.primary,
+          }}
+        />
+      }
+    />
+  );
+}
+
+function BubbleOpacityControl({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+}): React.JSX.Element {
+  const { colors } = useTheme();
+  const opacity = nearestBubbleOpacity(value);
+
+  return (
+    <StepperControl
+      label="Opacity"
+      atMin={opacity <= MIN_BUBBLE_OPACITY}
+      atMax={opacity >= MAX_BUBBLE_OPACITY}
+      onDecrease={() => onChange(stepBubbleOpacity(opacity, -1))}
+      onIncrease={() => onChange(stepBubbleOpacity(opacity, 1))}
+      decreaseLabel="More transparent bubbles"
+      increaseLabel="More opaque bubbles"
+      preview={
+        <View
+          style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: colors.primary, opacity }}
+        />
+      }
+    />
   );
 }
 
@@ -214,6 +282,9 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.sm,
     paddingHorizontal: SPACING.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
+    gap: SPACING.xs,
+  },
+  controls: {
     gap: SPACING.xs,
   },
   sizeRow: {
