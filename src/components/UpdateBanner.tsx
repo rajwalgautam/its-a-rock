@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { IN_APP_UPDATES_ENABLED } from '@/constants/features';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useUpdateStore } from '@/store/useUpdateStore';
@@ -20,7 +21,7 @@ export function UpdateBanner(): React.JSX.Element | null {
   const dismiss = useUpdateStore((s) => s.dismiss);
   const [downloading, setDownloading] = useState(false);
 
-  if (availableVersion === null) return null;
+  if (!IN_APP_UPDATES_ENABLED || availableVersion === null) return null;
 
   async function handlePress(): Promise<void> {
     if (downloading || availableVersion === null) return;

@@ -1,6 +1,7 @@
 {
   "name": "its-a-rock",
   "version": "0.0.0",
+  "license": "MIT",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",

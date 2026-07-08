@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import { IN_APP_UPDATES_ENABLED } from '@/constants/features';
 import { FONT_SIZE, RADIUS, SHADOW, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useSettingsStore } from '@/store/useSettingsStore';
@@ -144,28 +145,32 @@ export default function Settings(): React.JSX.Element {
             <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Version</Text>
             <Text style={[styles.rowValue, { color: colors.textSecondary }]}>v{version}</Text>
           </View>
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <Pressable
-            style={styles.row}
-            onPress={() => void (latestVersion !== null ? downloadUpdate() : checkForUpdates())}
-            disabled={checking || downloading}
-          >
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Check for Updates</Text>
-            <Text style={[styles.rowValue, { color: colors.primary }]}>
-              {checking
-                ? 'Checking…'
-                : downloading
-                  ? 'Downloading…'
-                  : latestVersion !== null
-                    ? `v${latestVersion} available →`
-                    : hasChecked
-                      ? 'Up to date'
-                      : 'Check'}
-            </Text>
-          </Pressable>
-          <Text style={[styles.lastChecked, { color: colors.textMuted }]}>
-            {formatLastChecked(lastChecked)}
-          </Text>
+          {IN_APP_UPDATES_ENABLED && (
+            <>
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              <Pressable
+                style={styles.row}
+                onPress={() => void (latestVersion !== null ? downloadUpdate() : checkForUpdates())}
+                disabled={checking || downloading}
+              >
+                <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Check for Updates</Text>
+                <Text style={[styles.rowValue, { color: colors.primary }]}>
+                  {checking
+                    ? 'Checking…'
+                    : downloading
+                      ? 'Downloading…'
+                      : latestVersion !== null
+                        ? `v${latestVersion} available →`
+                        : hasChecked
+                          ? 'Up to date'
+                          : 'Check'}
+                </Text>
+              </Pressable>
+              <Text style={[styles.lastChecked, { color: colors.textMuted }]}>
+                {formatLastChecked(lastChecked)}
+              </Text>
+            </>
+          )}
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <Pressable style={styles.row} onPress={() => router.push('/releases')}>
             <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>Release notes</Text>
