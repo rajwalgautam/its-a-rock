@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
+import type { PlanMode } from '@/constants/plan';
 import { useTheme } from '@/theme/ThemeProvider';
 import { MediaCaptureMenu } from '@/components/MediaCaptureMenu';
 import type { MediaItem } from '@/types';
@@ -28,8 +29,8 @@ interface NotesEditorProps {
   onChange: (notes: NoteDraft[]) => void;
   /** Attach freshly picked media to a note (also added to the gallery). */
   onAttachMedia: (key: string, item: MediaItem) => void;
-  /** Persist the form and open the planner for this note's media. */
-  onPlan: (key: string) => void;
+  /** Persist the form and open the planner for this note's media in the given mode. */
+  onPlan: (key: string, mode: PlanMode) => void;
 }
 
 let keySeq = 0;
@@ -38,7 +39,7 @@ function freshKey(): string {
 }
 
 /** Build an empty draft. */
-function emptyDraft(): NoteDraft {
+export function emptyDraft(): NoteDraft {
   return { id: null, key: freshKey(), body: '', mediaUri: null, mediaType: null, hasPlan: false };
 }
 
@@ -89,17 +90,15 @@ export function NotesEditor({
                   </View>
                 )}
               </View>
-              {note.mediaType === 'photo' && (
+              {note.mediaType === 'photo' && note.hasPlan && (
                 <Pressable
-                  onPress={() => onPlan(note.key)}
+                  onPress={() => onPlan(note.key, 'full')}
                   style={[styles.planBtn, { borderColor: colors.primary }]}
                   accessibilityRole="button"
-                  accessibilityLabel="Plan this move"
+                  accessibilityLabel="Edit plan"
                 >
                   <Ionicons name="footsteps-outline" size={18} color={colors.primary} />
-                  <Text style={[styles.planText, { color: colors.primary }]}>
-                    {note.hasPlan ? 'Edit plan' : 'Plan'}
-                  </Text>
+                  <Text style={[styles.planText, { color: colors.primary }]}>Edit plan</Text>
                 </Pressable>
               )}
               <Pressable
@@ -109,6 +108,33 @@ export function NotesEditor({
                 style={styles.clearMedia}
               >
                 <Ionicons name="close-circle" size={22} color={colors.textMuted} />
+              </Pressable>
+            </View>
+          )}
+
+          {/* A photo without a plan yet: choose how much of the body to plan. */}
+          {note.mediaType === 'photo' && !note.hasPlan && (
+            <View style={styles.planChoiceRow}>
+              <Pressable
+                onPress={() => onPlan(note.key, 'hands')}
+                style={[styles.planChoiceBtn, { borderColor: colors.primary }]}
+                accessibilityRole="button"
+                accessibilityLabel="Plan hands only"
+              >
+                <View style={styles.handIcons}>
+                  <MaterialCommunityIcons name="hand-back-left" size={18} color={colors.primary} />
+                  <MaterialCommunityIcons name="hand-back-right" size={18} color={colors.primary} />
+                </View>
+                <Text style={[styles.planText, { color: colors.primary }]}>Hands Only</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => onPlan(note.key, 'full')}
+                style={[styles.planChoiceBtn, { borderColor: colors.primary }]}
+                accessibilityRole="button"
+                accessibilityLabel="Plan full route"
+              >
+                <Ionicons name="map-outline" size={18} color={colors.primary} />
+                <Text style={[styles.planText, { color: colors.primary }]}>Full Plan</Text>
               </Pressable>
             </View>
           )}
@@ -226,6 +252,24 @@ const styles = StyleSheet.create({
   planText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: '700',
+  },
+  planChoiceRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  planChoiceBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.sm,
+  },
+  handIcons: {
+    flexDirection: 'row',
   },
   clearMedia: {
     marginLeft: 'auto',

@@ -22,6 +22,8 @@ const ACTION_SIZE = 48;
 interface PlanEditBarProps {
   activeLimb: Limb;
   onLimbChange: (limb: Limb) => void;
+  /** Limbs the selector offers; defaults to all four (hands-only passes two). */
+  limbs?: readonly Limb[];
   grouping: boolean;
   onToggleGroup: () => void;
   /** Grouping is unavailable (e.g. during the initial 4-limb seeding). */
@@ -46,6 +48,7 @@ interface PlanEditBarProps {
 export function PlanEditBar({
   activeLimb,
   onLimbChange,
+  limbs,
   grouping,
   onToggleGroup,
   groupDisabled = false,
@@ -80,7 +83,7 @@ export function PlanEditBar({
         <BubbleOpacityControl value={bubbleOpacity} onChange={onBubbleOpacityChange} />
       </View>
 
-      <LimbSelector active={activeLimb} onChange={onLimbChange} />
+      <LimbSelector active={activeLimb} onChange={onLimbChange} limbs={limbs} />
 
       <View style={styles.actions}>
         <View style={[styles.side, styles.sideStart]}>
