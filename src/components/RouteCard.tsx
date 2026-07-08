@@ -7,6 +7,7 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { RouteForm } from '@/components/RouteForm';
 import { MediaViewer } from '@/components/MediaViewer';
 import { NotesSection } from '@/components/NotesSection';
+import { NoteActionSheet } from '@/components/NoteActionSheet';
 import { useRouteStore } from '@/store/useRouteStore';
 import { formatDate, formatGradeLabel, statusLabel } from '@/utils/formatters';
 import type { RouteInput, RouteNote, RouteWithGym } from '@/types';
@@ -26,6 +27,8 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
   const [addingNote, setAddingNote] = useState(false);
   const [current, setCurrent] = useState(route);
   const [viewerOpen, setViewerOpen] = useState(false);
+  // The note whose action sheet (edit note / edit plan) is open, if any.
+  const [actionNote, setActionNote] = useState<RouteNote | null>(null);
 
   /** Open a note's plan in the full planner, scoped to that note's media. */
   function openNotePlan(note: RouteNote): void {
@@ -158,7 +161,20 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
         <Text style={[styles.editText, { color: colors.primary }]}>Add note</Text>
       </Pressable>
 
-      <NotesSection notes={current.noteEntries} onPressNote={openNotePlan} />
+      <NotesSection notes={current.noteEntries} onPressNote={setActionNote} />
+
+      <NoteActionSheet
+        note={actionNote}
+        onClose={() => setActionNote(null)}
+        onEditNote={() => {
+          setActionNote(null);
+          startEditing(false);
+        }}
+        onEditPlan={(note) => {
+          setActionNote(null);
+          openNotePlan(note);
+        }}
+      />
     </ScrollView>
   );
 }

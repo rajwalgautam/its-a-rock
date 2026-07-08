@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { FONT_SIZE, SPACING } from '@/constants/theme';
+import { limbsForMode, parsePlanMode } from '@/constants/plan';
 import { LIMB_NAME, LIMB_ORDER, limbColor } from '@/constants/limbs';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useRouteStore } from '@/store/useRouteStore';
@@ -96,7 +97,8 @@ async function resolveDimensions(
 export default function RoutePlanScreen(): React.JSX.Element {
   const { colors } = useTheme();
   const router = useRouter();
-  const params = useLocalSearchParams<{ routeId: string; noteId?: string }>();
+  const params = useLocalSearchParams<{ routeId: string; noteId?: string; mode?: string }>();
+  const limbOrder = limbsForMode(parsePlanMode(params.mode));
   const getRoute = useRouteStore((s) => s.getRoute);
   const loadPlan = usePlanStore((s) => s.loadPlan);
   const loadNotePlan = usePlanStore((s) => s.loadNotePlan);
@@ -232,7 +234,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     // While seeding the starting stance, every placement is solo (grouping is
     // disabled) and the active limb auto-advances to the next unplaced one.
-    const seeding = isSeeding(movesRef.current);
+    const seeding = isSeeding(movesRef.current, limbOrder);
     const move: DraftMove = {
       key: `new-${tempCounter.current++}`,
       limb: activeLimb,
@@ -243,7 +245,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
       floating: false,
     };
     const next = appendMove(movesRef.current, move);
-    if (seeding) setActiveLimb(nextSeedLimb(activeLimb, next));
+    if (seeding) setActiveLimb(nextSeedLimb(activeLimb, next, limbOrder));
     void commitMoves(next);
   }
 
@@ -315,7 +317,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
   }
 
   const playing = mode === 'play';
-  const seeding = isSeeding(moves);
+  const seeding = isSeeding(moves, limbOrder);
   // Grouping is suppressed until the starting stance is complete.
   const grouping = !seeding && groupId !== null;
   const placedCount = new Set(moves.map((m) => m.limb)).size;
@@ -392,7 +394,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
           <View style={styles.hint} pointerEvents="none">
             <Text style={[styles.hintText, { color: colors.onOverlay, backgroundColor: colors.overlay }]}>
               {seeding
-                ? `Place all 4 limbs to set your start (${placedCount}/4) — tap the wall to place your ${LIMB_NAME[activeLimb].toLowerCase()}.`
+                ? `Place all ${limbOrder.length} limbs to set your start (${placedCount}/${limbOrder.length}) — tap the wall to place your ${LIMB_NAME[activeLimb].toLowerCase()}.`
                 : grouping
                   ? 'Grouping on — limbs you place now move together.'
                   : ''}
@@ -423,6 +425,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
         <PlanEditBar
           activeLimb={activeLimb}
           onLimbChange={setActiveLimb}
+          limbs={limbOrder}
           grouping={grouping}
           onToggleGroup={toggleGrouping}
           groupDisabled={seeding}

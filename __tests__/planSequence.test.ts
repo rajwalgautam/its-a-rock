@@ -254,4 +254,19 @@ describe('initial 4-limb seeding', () => {
   it('returns the current limb once every limb is placed', () => {
     expect(nextSeedLimb('RF', stance)).toBe('RF');
   });
+
+  it('hands-only seeds on just the two hands', () => {
+    const hands: readonly Limb[] = ['LH', 'RH'];
+    expect(isSeeding([], hands)).toBe(true);
+    expect(isSeeding([move('a', 'LH')], hands)).toBe(true);
+    // Both hands down — seeding is complete even though the feet never are.
+    expect(isSeeding([move('a', 'LH'), move('b', 'RH')], hands)).toBe(false);
+  });
+
+  it('hands-only advances LH -> RH and wraps within the hands', () => {
+    const hands: readonly Limb[] = ['LH', 'RH'];
+    expect(nextSeedLimb('LH', [move('a', 'LH')], hands)).toBe('RH');
+    // Only RH placed — wraps back to the unplaced LH rather than a foot.
+    expect(nextSeedLimb('RH', [move('a', 'RH')], hands)).toBe('LH');
+  });
 });

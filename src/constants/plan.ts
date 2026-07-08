@@ -1,6 +1,28 @@
 // Route-planner tuning that's shared between the screen, the canvas markers,
 // and the persisted bubble-size preference.
 
+import { LIMB_ORDER } from '@/constants/limbs';
+import type { Limb } from '@/types';
+
+/**
+ * How much of the body a plan covers. `full` places all four limbs; `hands`
+ * restricts the planner to the two hands (for beta that only tracks handholds).
+ */
+export type PlanMode = 'hands' | 'full';
+
+/** The two hands, in canonical order — the limbs a hands-only plan can place. */
+export const HANDS_ONLY_LIMBS: readonly Limb[] = ['LH', 'RH'];
+
+/** The limbs a given plan mode lets you place. */
+export function limbsForMode(mode: PlanMode): readonly Limb[] {
+  return mode === 'hands' ? HANDS_ONLY_LIMBS : LIMB_ORDER;
+}
+
+/** Coerce an untrusted nav param into a valid plan mode (defaults to `full`). */
+export function parsePlanMode(value: string | undefined): PlanMode {
+  return value === 'hands' ? 'hands' : 'full';
+}
+
 /**
  * Discrete bubble (limb marker) sizes the user can step through on the plan
  * screen, as multipliers of the base dot size. `1` is the historical size.

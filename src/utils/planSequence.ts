@@ -78,23 +78,29 @@ export function placedLimbs(moves: DraftMove[]): Set<Limb> {
 
 /**
  * Whether the plan is still in its starting-stance "seeding" phase — the user
- * must place all four limbs before free editing begins. True until every limb
- * in `LIMB_ORDER` has at least one placement.
+ * must place every limb once before free editing begins. True until each limb
+ * in `limbs` has at least one placement (all four by default; the hands-only
+ * planner passes just the two hands).
  */
-export function isSeeding(moves: DraftMove[]): boolean {
-  return placedLimbs(moves).size < LIMB_ORDER.length;
+export function isSeeding(moves: DraftMove[], limbs: readonly Limb[] = LIMB_ORDER): boolean {
+  const placed = placedLimbs(moves);
+  return limbs.some((l) => !placed.has(l));
 }
 
 /**
- * The next limb to place during seeding: scan `LIMB_ORDER` starting just after
+ * The next limb to place during seeding: scan `limbs` starting just after
  * `current` (wrapping) and return the first limb not yet placed. Falls back to
  * `current` when every limb is already down.
  */
-export function nextSeedLimb(current: Limb, moves: DraftMove[]): Limb {
+export function nextSeedLimb(
+  current: Limb,
+  moves: DraftMove[],
+  limbs: readonly Limb[] = LIMB_ORDER,
+): Limb {
   const placed = placedLimbs(moves);
-  const start = LIMB_ORDER.indexOf(current);
-  for (let i = 1; i <= LIMB_ORDER.length; i++) {
-    const candidate = LIMB_ORDER[(start + i) % LIMB_ORDER.length]!;
+  const start = limbs.indexOf(current);
+  for (let i = 1; i <= limbs.length; i++) {
+    const candidate = limbs[(start + i) % limbs.length]!;
     if (!placed.has(candidate)) return candidate;
   }
   return current;

@@ -8,15 +8,21 @@ import type { Limb } from '@/types';
 interface LimbSelectorProps {
   active: Limb;
   onChange: (limb: Limb) => void;
+  /** Limbs to offer; defaults to all four. Hands-only plans pass just the hands. */
+  limbs?: readonly Limb[];
 }
 
 /** Row of limb buttons (hand/foot icons) choosing which limb the next tap places. */
-export function LimbSelector({ active, onChange }: LimbSelectorProps): React.JSX.Element {
+export function LimbSelector({
+  active,
+  onChange,
+  limbs = LIMB_ORDER,
+}: LimbSelectorProps): React.JSX.Element {
   const { colors } = useTheme();
 
   return (
     <View style={styles.row}>
-      {LIMB_ORDER.map((limb) => {
+      {limbs.map((limb) => {
         const color = limbColor(colors, limb);
         const isActive = limb === active;
         return (

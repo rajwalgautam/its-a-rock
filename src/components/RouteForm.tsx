@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
+import type { PlanMode } from '@/constants/plan';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { useRouteStore } from '@/store/useRouteStore';
@@ -210,7 +211,7 @@ export function RouteForm({
   }
 
   /** Persist the form, then open the planner for the given note's media. */
-  async function handlePlanNote(key: string): Promise<void> {
+  async function handlePlanNote(key: string, mode: PlanMode): Promise<void> {
     if (onPersistDraft === undefined) return;
     const input = toInput(state, { dropEmpty: false });
     const result = validateRouteInput(input);
@@ -232,7 +233,7 @@ export function RouteForm({
       pendingReload.current = true;
       router.push({
         pathname: '/plan/[routeId]',
-        params: { routeId: String(saved.id), noteId: String(note.id) },
+        params: { routeId: String(saved.id), noteId: String(note.id), mode },
       });
     } finally {
       setSaving(false);
@@ -330,7 +331,7 @@ export function RouteForm({
           favorite={coverItem(state.media)}
           onChange={(notes) => patch({ notes })}
           onAttachMedia={attachMediaToNote}
-          onPlan={(key) => void handlePlanNote(key)}
+          onPlan={(key, mode) => void handlePlanNote(key, mode)}
         />
       </Field>
 
