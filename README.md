@@ -22,7 +22,7 @@ breakdown.
 Mark your hands and feet on the climb's photo, sequence the moves, and play the
 beta back move by move.
 
-![Planning a route — marking hands and feet, sequencing moves, and playing the beta back](assets/demo-route-planner.gif)
+<img src="assets/demo-route-planner.gif" alt="Planning a route — marking hands and feet, sequencing moves, and playing the beta back" width="300" />
 
 ## Features
 
