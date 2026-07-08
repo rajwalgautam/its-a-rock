@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { IN_APP_UPDATES_ENABLED } from '@/constants/features';
 import {
   getLastNotifiedVersion,
   markVersionNotified,
@@ -15,6 +16,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
   availableVersion: null,
 
   runStartupCheck: async () => {
+    if (!IN_APP_UPDATES_ENABLED) return;
     try {
       const result = await performUpdateCheck();
       if (!result.isNewer) return;

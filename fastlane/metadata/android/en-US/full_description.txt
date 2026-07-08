@@ -1,0 +1,26 @@
+It's A Rock is an offline-first app for tracking your bouldering progress across
+multiple gyms. Photograph a climb, tag it with a grade and the gym it's at, track
+whether you've sent it or are still projecting it — and plan the beta move by move.
+
+There is no account, no backend, and no network dependency for core use. All your
+data lives in on-device SQLite and never leaves your phone.
+
+Features:
+
+* Visual, tile-driven log — the photo of the climb is the primary content. Browse
+  everything as a photo grid with adjustable column density.
+* My Climbing tab — this-week Visits / Sends / Projects stats plus your active
+  projects, and a floating button to add a climb.
+* History tab — every climb you've logged, with filter and sort.
+* Climbs — each has an optional photo, a V-scale grade (with + / -), a
+  gym/location, start and send dates, and a sent/projecting status.
+* Media galleries — attach multiple photos and videos to a climb, not just a
+  single cover shot.
+* Multiple notes per climb — keep several beta notes and attach a photo or video
+  to any of them. View notes as rows or as a grid.
+* Move-by-move beta planner — from a note's photo, mark where each hand and foot
+  goes, order the moves, and play the sequence back step by step.
+* Light / dark theme with a Light / Dark / System toggle.
+
+Your climbing history stays yours — private, on your device, and available with no
+signal at the gym.

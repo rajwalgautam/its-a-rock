@@ -18,8 +18,14 @@ local device deploy used for testing.
 
 - Versions are `vMAJOR.MINOR.PATCH` (e.g. `v0.2.0`). The leading `v` is used for
   git tags and changelog filenames; `app.json` stores the bare number (`0.2.0`).
-- **You do not edit `app.json` by hand.** The release workflow sets the version
-  during the build; `app.json` on the repo stays at `0.0.0` and is never committed.
+- **You do not edit `app.json` by hand.** The release workflow derives both the
+  version name and the Android `versionCode` from the dispatched tag and commits
+  that bump **onto the tagged commit** (message `chore(release): vX.Y.Z [skip ci]`).
+  The bump is reachable only via the tag — it is **not** pushed to `main`, which
+  stays at the `0.0.0` placeholder. This means every tag carries the real version,
+  so external builders (e.g. F-Droid) that build from the tag get correct values.
+- `versionCode` is computed as `MAJOR*10000 + MINOR*100 + PATCH` (so `v1.5.2` →
+  `10502`): unique and monotonically increasing as long as versions keep climbing.
 - One changelog file per version lives in [`changelogs/`](../changelogs), named
   `vX.Y.Z.md`.
 

@@ -89,4 +89,5 @@ src/
 
 ## License
 
-Personal project; not currently licensed for redistribution.
+Released under the [MIT License](LICENSE) — free to use, modify, and
+redistribute.
