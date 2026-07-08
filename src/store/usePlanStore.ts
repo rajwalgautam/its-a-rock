@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { PlanMoveInput, RoutePlan } from '@/types';
 import {
+  duplicateNotePlan,
   getOrCreatePlanForNote,
   getOrCreatePlanForRoute,
   persistPlanPhoto,
@@ -27,6 +28,11 @@ interface PlanState {
   ) => Promise<RoutePlan | null>;
   /** Replace the current plan's moves (renumbering sequence) and persist. */
   saveMoves: (moves: PlanMoveInput[]) => Promise<RoutePlan | null>;
+  /**
+   * Copy a note and its plan into a new note (to try a variation). Returns the
+   * new note's id, or null on failure.
+   */
+  duplicatePlan: (routeId: number, noteId: number) => Promise<number | null>;
   clear: () => void;
 }
 
@@ -81,6 +87,15 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       const plan = await savePlanMoves(current.id, moves);
       set({ plan });
       return plan;
+    } catch (e) {
+      set({ error: errMessage(e) });
+      return null;
+    }
+  },
+
+  duplicatePlan: async (routeId, noteId) => {
+    try {
+      return await duplicateNotePlan(routeId, noteId);
     } catch (e) {
       set({ error: errMessage(e) });
       return null;

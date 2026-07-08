@@ -9,6 +9,7 @@ import { MediaViewer } from '@/components/MediaViewer';
 import { NotesSection } from '@/components/NotesSection';
 import { NoteActionSheet } from '@/components/NoteActionSheet';
 import { useRouteStore } from '@/store/useRouteStore';
+import { usePlanStore } from '@/store/usePlanStore';
 import { formatDate, formatGradeLabel, statusLabel } from '@/utils/formatters';
 import type { RouteInput, RouteNote, RouteWithGym } from '@/types';
 
@@ -23,6 +24,8 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
   const { colors } = useTheme();
   const router = useRouter();
   const editRoute = useRouteStore((s) => s.editRoute);
+  const getRoute = useRouteStore((s) => s.getRoute);
+  const duplicatePlan = usePlanStore((s) => s.duplicatePlan);
   const [editing, setEditing] = useState(false);
   const [addingNote, setAddingNote] = useState(false);
   const [current, setCurrent] = useState(route);
@@ -36,6 +39,17 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
       pathname: '/plan/[routeId]',
       params: { routeId: String(current.id), noteId: String(note.id) },
     });
+  }
+
+  /** Copy a note + its plan, then reload so the duplicate appears in the list. */
+  async function handleDuplicatePlan(note: RouteNote): Promise<void> {
+    const newNoteId = await duplicatePlan(current.id, note.id);
+    if (newNoteId === null) return;
+    const reloaded = await getRoute(current.id);
+    if (reloaded !== null) {
+      setCurrent(reloaded);
+      onSaved?.(reloaded);
+    }
   }
 
   async function handleSave(input: RouteInput): Promise<void> {
@@ -173,6 +187,10 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
         onEditPlan={(note) => {
           setActionNote(null);
           openNotePlan(note);
+        }}
+        onDuplicatePlan={(note) => {
+          setActionNote(null);
+          void handleDuplicatePlan(note);
         }}
       />
     </ScrollView>

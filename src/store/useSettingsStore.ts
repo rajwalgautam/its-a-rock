@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ColumnDensity, NotesLayout, ThemeMode } from '@/types';
+import type { ColumnDensity, GradeSystem, NotesLayout, ThemeMode } from '@/types';
 import {
   DEFAULT_SETTINGS,
   loadSettings,
@@ -18,6 +18,7 @@ interface SettingsState extends Settings {
   setBubbleScale: (value: number) => void;
   setBubbleOpacity: (value: number) => void;
   setNotesLayout: (value: NotesLayout) => void;
+  setGradeSystem: (value: GradeSystem) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -29,6 +30,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   bubbleScale: DEFAULT_SETTINGS.bubbleScale,
   bubbleOpacity: DEFAULT_SETTINGS.bubbleOpacity,
   notesLayout: DEFAULT_SETTINGS.notesLayout,
+  gradeSystem: DEFAULT_SETTINGS.gradeSystem,
   isLoaded: false,
 
   load: async () => {
@@ -75,6 +77,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ notesLayout: value });
     void persist(get);
   },
+
+  setGradeSystem: (value) => {
+    set({ gradeSystem: value });
+    void persist(get);
+  },
 }));
 
 function persist(get: () => SettingsState): Promise<void> {
@@ -87,6 +94,7 @@ function persist(get: () => SettingsState): Promise<void> {
     bubbleScale,
     bubbleOpacity,
     notesLayout,
+    gradeSystem,
   } = get();
   return saveSettings({
     themeMode,
@@ -97,5 +105,6 @@ function persist(get: () => SettingsState): Promise<void> {
     bubbleScale,
     bubbleOpacity,
     notesLayout,
+    gradeSystem,
   });
 }

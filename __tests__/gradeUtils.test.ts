@@ -2,8 +2,11 @@ import {
   compareGrades,
   formatGrade,
   formatGradeRange,
+  gradeRungIndex,
   gradeSortValue,
+  gradeSystemOf,
   isGradeRange,
+  isKnownGrade,
   isValidGradeOrRange,
   parseGrade,
   parseGradeRange,
@@ -98,12 +101,48 @@ describe('grade ranges', () => {
     expect(isValidGradeOrRange('V4-V4')).toBe(true);
     expect(isValidGradeOrRange('V5-V2')).toBe(false);
     expect(isValidGradeOrRange('V4+')).toBe(true);
-    expect(isValidGradeOrRange('5.11a')).toBe(false);
     expect(isValidGradeOrRange(null)).toBe(false);
   });
 
   it('sorts a range by its lower bound', () => {
     expect(gradeSortValue('V2-V6')).toBe(gradeSortValue('V2'));
     expect(compareGrades('V0-V2', 'V3')).toBeLessThan(0);
+  });
+});
+
+describe('multi-system grades', () => {
+  it('recognizes YDS and French tokens as known grades', () => {
+    expect(isKnownGrade('5.10a')).toBe(true);
+    expect(isKnownGrade('6b+')).toBe(true);
+    expect(isKnownGrade('V4+')).toBe(true);
+    expect(isKnownGrade('nonsense')).toBe(false);
+    expect(isKnownGrade(null)).toBe(false);
+  });
+
+  it('validates single grades in any supported system', () => {
+    expect(isValidGradeOrRange('5.11a')).toBe(true);
+    expect(isValidGradeOrRange('7c+')).toBe(true);
+    expect(isValidGradeOrRange('5.99z')).toBe(false);
+  });
+
+  it('identifies which system a grade belongs to', () => {
+    expect(gradeSystemOf('V4+')).toBe('V');
+    expect(gradeSystemOf('5.12a')).toBe('YDS');
+    expect(gradeSystemOf('6a+')).toBe('French');
+    expect(gradeSystemOf('nope')).toBeNull();
+  });
+
+  it('orders within YDS and within French ascending', () => {
+    expect(gradeSortValue('5.10a')).toBeLessThan(gradeSortValue('5.10b'));
+    expect(gradeSortValue('5.9')).toBeLessThan(gradeSortValue('5.10a'));
+    expect(gradeSortValue('6a')).toBeLessThan(gradeSortValue('6a+'));
+    expect(gradeSortValue('7c+')).toBeLessThan(gradeSortValue('8a'));
+  });
+
+  it('folds V modifiers onto their base for rung filtering', () => {
+    expect(gradeRungIndex('V4+')).toBe(gradeRungIndex('V4-'));
+    expect(gradeRungIndex('V4')).toBeLessThan(gradeRungIndex('V5'));
+    expect(gradeRungIndex('5.10a')).toBeLessThan(gradeRungIndex('5.10b'));
+    expect(gradeRungIndex('nonsense')).toBe(-1);
   });
 });

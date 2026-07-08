@@ -8,6 +8,7 @@ import { IN_APP_UPDATES_ENABLED } from '@/constants/features';
 import { FONT_SIZE, RADIUS, SHADOW, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useSettingsStore } from '@/store/useSettingsStore';
+import { GRADE_SYSTEMS, GRADE_SYSTEM_ORDER } from '@/constants/grades';
 import { LocationsManager } from '@/components/LocationsManager';
 import {
   downloadAndInstallApk,
@@ -30,6 +31,8 @@ export default function Settings(): React.JSX.Element {
   const setPromptSendVideo = useSettingsStore((s) => s.setPromptSendVideo);
   const muteVideosByDefault = useSettingsStore((s) => s.muteVideosByDefault);
   const setMuteVideosByDefault = useSettingsStore((s) => s.setMuteVideosByDefault);
+  const gradeSystem = useSettingsStore((s) => s.gradeSystem);
+  const setGradeSystem = useSettingsStore((s) => s.setGradeSystem);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [checking, setChecking] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
@@ -97,6 +100,36 @@ export default function Settings(): React.JSX.Element {
               );
             })}
           </View>
+        </View>
+
+        <SectionLabel label="Grades" />
+        <View style={[styles.card, { backgroundColor: colors.surface }, SHADOW.sm]}>
+          <View style={[styles.segmented, { backgroundColor: colors.surfaceAlt }]}>
+            {GRADE_SYSTEM_ORDER.map((system) => {
+              const active = system === gradeSystem;
+              return (
+                <Pressable
+                  key={system}
+                  onPress={() => setGradeSystem(system)}
+                  style={[styles.segment, active && { backgroundColor: colors.surface }]}
+                >
+                  <Text
+                    style={{
+                      color: active ? colors.primary : colors.textSecondary,
+                      fontWeight: '700',
+                      fontSize: FONT_SIZE.sm,
+                    }}
+                  >
+                    {GRADE_SYSTEMS[system].label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={[styles.rowHint, { color: colors.textMuted, marginTop: SPACING.sm }]}>
+            The scale used when logging a climb&apos;s grade. Existing climbs keep the
+            grade they were logged with.
+          </Text>
         </View>
 
         <SectionLabel label="Logging" />

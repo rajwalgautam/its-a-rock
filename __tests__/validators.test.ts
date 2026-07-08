@@ -26,7 +26,10 @@ describe('validateRouteInput', () => {
   it('rejects an invalid grade but allows a valid or empty one', () => {
     expect(validateRouteInput(input({ grade: 'V4+' })).valid).toBe(true);
     expect(validateRouteInput(input({ grade: '' })).valid).toBe(true);
-    expect(validateRouteInput(input({ grade: '5.11a' })).valid).toBe(false);
+    // YDS and French grades are valid too, in their systems.
+    expect(validateRouteInput(input({ grade: '5.11a' })).valid).toBe(true);
+    expect(validateRouteInput(input({ grade: '6b+' })).valid).toBe(true);
+    expect(validateRouteInput(input({ grade: 'banana' })).valid).toBe(false);
   });
 
   it('accepts a valid grade range and rejects a reversed one', () => {

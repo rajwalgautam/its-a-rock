@@ -1,6 +1,8 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
+import { GRADE_SYSTEMS } from '@/constants/grades';
 import { useTheme } from '@/theme/ThemeProvider';
+import { useSettingsStore } from '@/store/useSettingsStore';
 import {
   GRADE_BASES,
   GRADE_MODIFIERS,
@@ -18,10 +20,72 @@ interface GradePickerProps {
 }
 
 /**
- * Grade selector. By default it picks a single V-scale grade; the "Range"
- * toggle reveals a second scale so a climb can be logged as e.g. "V0–V2".
+ * Grade selector. The active system (Settings → Grades) decides the scale: the
+ * V-scale offers bases + a -/+ modifier and an optional "Range" (e.g. "V0–V2"),
+ * while YDS and French present a single ascending scale of tokens.
  */
 export function GradePicker({ value, onChange }: GradePickerProps): React.JSX.Element {
+  const gradeSystem = useSettingsStore((s) => s.gradeSystem);
+  if (gradeSystem !== 'V') {
+    return (
+      <SimpleScale
+        grades={GRADE_SYSTEMS[gradeSystem].grades}
+        value={value}
+        onChange={onChange}
+      />
+    );
+  }
+  return <VGradePicker value={value} onChange={onChange} />;
+}
+
+/** A single ascending row of grade chips (YDS / French); tap the active to clear. */
+function SimpleScale({
+  grades,
+  value,
+  onChange,
+}: {
+  grades: readonly string[];
+  value: string | null;
+  onChange: (grade: string | null) => void;
+}): React.JSX.Element {
+  const { colors } = useTheme();
+  const selected = value !== null ? value.trim() : null;
+  return (
+    <View style={styles.scale}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+        {grades.map((g) => {
+          const active = g === selected;
+          return (
+            <Pressable
+              key={g}
+              onPress={() => onChange(active ? null : g)}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: active ? colors.primary : colors.surfaceAlt,
+                  borderColor: active ? colors.primary : colors.border,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color: active ? colors.onPrimary : colors.textSecondary,
+                  fontSize: FONT_SIZE.md,
+                  fontWeight: '700',
+                }}
+              >
+                {g}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+/** The V-scale picker: base chips + -/+ modifier, with an optional range mode. */
+function VGradePicker({ value, onChange }: GradePickerProps): React.JSX.Element {
   const { colors } = useTheme();
   const range = parseGradeRange(value);
   const [rangeMode, setRangeMode] = useState(range !== null);

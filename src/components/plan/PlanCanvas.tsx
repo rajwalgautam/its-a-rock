@@ -107,9 +107,12 @@ export function PlanCanvas({
 
   function place(sx: number, sy: number): void {
     if (layout.displayedW <= 0 || onPlace === undefined) return;
-    // Ignore taps that land on an existing marker — those are handled by the
-    // marker's own tap (select), so placing here too would double-fire.
+    // Ignore taps that land on an *interactive* marker — those are handled by
+    // the marker's own tap (select), so placing here too would double-fire.
+    // Superseded (muted) markers are non-interactive, so a tap near one places a
+    // new overlapping move instead of being swallowed.
     const onMarker = markers.some((m) => {
+      if (m.muted === true) return false;
       const c = toScreen({ x: m.x, y: m.y }, layout);
       return Math.hypot(c.x - sx, c.y - sy) <= MARKER_GUARD;
     });
@@ -219,6 +222,10 @@ export function PlanCanvas({
                   floating={m.floating}
                   current={m.current}
                   muted={m.muted}
+                  // In edit mode, only current-stance markers stay interactive;
+                  // superseded ones let taps through to place a new move. Play
+                  // mode markers are never interactive.
+                  interactive={editable && m.muted !== true}
                   bubbleScale={bubbleScale}
                   bubbleOpacity={bubbleOpacity}
                   scale={scale}
