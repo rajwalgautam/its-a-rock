@@ -1,13 +1,19 @@
 # CI: run tests + typecheck on every push to main and on pull requests.
 #
 # Release (workflow_dispatch):
-#   "v0.1.9"               →  bumps app.json, creates the tag, builds and publishes the APK.
-#   "v0.1.5-rerelease"     →  rebuilds the APK from the v0.1.5 tag and publishes it as
-#                              a separate "v0.1.5-rerelease" release; no tag or branch changes.
+#   "v0.1.9"  →  every release gets a unix-time suffix, so the tag/release/app
+#                version become "v0.1.9-<epoch>" and the Android versionCode is
+#                that epoch. Releases are therefore unique and monotonic: just
+#                dispatch the same base version again to re-release it — the app's
+#                update check sees the newer build and installs it cleanly. The
+#                changelog stays keyed to the base version (changelogs/v0.1.9.md).
 #
 # Unlike water-tracker (which publishes to a separate release repo via a PAT),
 # It's A Rock publishes the APK as a Release in THIS repo using the built-in
-# GITHUB_TOKEN. No RELEASE_REPO_TOKEN is needed.
+# GITHUB_TOKEN. No RELEASE_REPO_TOKEN is needed. The version-bump commit is
+# pushed to main over SSH via the RELEASE_DEPLOY_KEY secret (a write deploy key
+# with a bypass on the "Protect main" ruleset), since GITHUB_TOKEN can't push
+# past the required-PR rule.
 name: CI / Release
 
 run-name: >-
@@ -33,7 +39,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release, e.g. v0.1.9. For a re-release enter e.g. v0.1.5-rerelease'
+        description: 'Base version to release, e.g. v0.1.9. A unix-time suffix is appended automatically; dispatch the same version again to re-release it.'
         required: true
 
 # ─── Jobs ─────────────────────────────────────────────────────────────────────
@@ -77,73 +83,72 @@ jobs:
     permissions:
       contents: write
     outputs:
-      version:      ${{ steps.resolve.outputs.version }}
-      release_tag:  ${{ steps.resolve.outputs.release_tag }}
-      checkout_ref: ${{ steps.resolve.outputs.checkout_ref }}
-      is_rerelease: ${{ steps.resolve.outputs.is_rerelease }}
+      version:           ${{ steps.resolve.outputs.version }}
+      version_code:      ${{ steps.resolve.outputs.version_code }}
+      release_tag:       ${{ steps.resolve.outputs.release_tag }}
+      checkout_ref:      ${{ steps.resolve.outputs.checkout_ref }}
+      changelog_version: ${{ steps.resolve.outputs.changelog_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          # Push over SSH as the release deploy key, which has a bypass on the
+          # "Protect main" ruleset — the default GITHUB_TOKEN cannot push to main.
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
 
-      - name: Resolve version and mode
+      - name: Resolve version
         id: resolve
         run: |
           INPUT="${{ github.event.inputs.version }}"
+          # Base version: strip a leading "v" and any prior build suffix
+          # ("-<digits>" or the legacy "-rerelease"), so dispatching either the
+          # base ("v1.5.3") or a previously suffixed tag resolves to the same base.
+          BARE_BASE="$(echo "$INPUT" | sed -E 's/^v//; s/-([0-9]+|rerelease)$//')"
+          EPOCH="$(date +%s)"
+          FULL="${BARE_BASE}-${EPOCH}"   # app version string, e.g. 1.5.3-1751999999
 
-          if [[ "$INPUT" == *"-rerelease" ]]; then
-            # ── Re-release mode ──────────────────────────────────────────────
-            BASE="${INPUT%-rerelease}"   # e.g. v0.1.5
-            if ! git ls-remote --tags origin "refs/tags/${BASE}" | grep -q "refs/tags/${BASE}"; then
-              echo "Tag ${BASE} does not exist — cannot re-release a version that was never released."
-              exit 1
-            fi
-            echo "version=${BASE}"       >> "$GITHUB_OUTPUT"
-            echo "release_tag=${INPUT}"  >> "$GITHUB_OUTPUT"
-            echo "checkout_ref=${BASE}"  >> "$GITHUB_OUTPUT"
-            echo "is_rerelease=true"     >> "$GITHUB_OUTPUT"
-            echo "Re-release mode: building from ${BASE}, publishing as ${INPUT}"
-          else
-            # ── Normal release mode ──────────────────────────────────────────
-            VERSION="$INPUT"
-            echo "version=${VERSION}"      >> "$GITHUB_OUTPUT"
-            echo "release_tag=${VERSION}"  >> "$GITHUB_OUTPUT"
-            echo "checkout_ref=${VERSION}" >> "$GITHUB_OUTPUT"
-            echo "is_rerelease=false"      >> "$GITHUB_OUTPUT"
-            echo "Release version: ${VERSION}"
-          fi
+          # A unix-time suffix makes every release unique and monotonic, so the
+          # same base version can be re-released and the app treats it as newer.
+          # The versionCode is the epoch too (fits a 32-bit int until Jan 2038).
+          # changelog_version keys the (base-only) changelog file.
+          echo "changelog_version=v${BARE_BASE}" >> "$GITHUB_OUTPUT"
+          echo "version=${FULL}"                 >> "$GITHUB_OUTPUT"
+          echo "version_code=${EPOCH}"           >> "$GITHUB_OUTPUT"
+          echo "release_tag=v${FULL}"            >> "$GITHUB_OUTPUT"
+          echo "checkout_ref=v${FULL}"           >> "$GITHUB_OUTPUT"
+          echo "Releasing v${FULL} (changelog v${BARE_BASE}, versionCode ${EPOCH})"
 
       - name: Require matching changelog
         run: |
-          # Fail fast — before any tag is created — if the version has no
-          # changelog. The filename must match the resolved version including the
-          # leading "v" (e.g. changelogs/v1.0.0.md). For a -rerelease, this is the
-          # base version. Catches typos like "v0.50" (only changelogs/v0.5.0.md exists).
-          VERSION="${{ steps.resolve.outputs.version }}"
+          # Fail fast — before any tag is created — if the base version has no
+          # changelog. The filename matches the base version including the leading
+          # "v" (e.g. changelogs/v1.0.0.md); the time suffix is not part of it.
+          # Catches typos like "v0.50" (only changelogs/v0.5.0.md exists).
+          VERSION="${{ steps.resolve.outputs.changelog_version }}"
           FILE="changelogs/${VERSION}.md"
           if [ ! -f "$FILE" ]; then
-            echo "::error::Missing ${FILE}. Create a changelog whose filename matches the release version including the leading 'v' (e.g. changelogs/v1.0.0.md) and commit it to main before releasing."
+            echo "::error::Missing ${FILE}. Create a changelog whose filename matches the base release version including the leading 'v' (e.g. changelogs/v1.0.0.md) and commit it to main before releasing."
             exit 1
           fi
           echo "Found changelog ${FILE}"
 
       - name: Bump app.json version and create tag
-        if: steps.resolve.outputs.is_rerelease == 'false'
         run: |
-          VERSION="${{ steps.resolve.outputs.version }}"
-          BARE="${VERSION#v}"
+          VERSION="${{ steps.resolve.outputs.version }}"           # e.g. 1.5.3-1751999999
+          VERSION_CODE="${{ steps.resolve.outputs.version_code }}" # the epoch
+          TAG="${{ steps.resolve.outputs.release_tag }}"           # e.g. v1.5.3-1751999999
 
           # Commit the version + versionCode into app.json so the *tag* carries
-          # the real values. External builders (e.g. F-Droid) build from the tag
-          # and need this; main stays at the 0.0.0 placeholder — the bump commit
-          # is reachable only via the tag, not pushed to any branch.
+          # the real values (external builders like F-Droid build from the tag)
+          # and push the same commit to the branch, so main always reflects the
+          # latest released version.
           node -e "
             const fs = require('fs');
             const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
-            app.expo.version = '${BARE}';
-            const [maj, min, pat] = '${BARE}'.split('.').map(Number);
+            app.expo.version = '${VERSION}';
             app.expo.android = {
               ...(app.expo.android || {}),
-              versionCode: maj * 10000 + min * 100 + pat,
+              versionCode: ${VERSION_CODE},
             };
             fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
           "
@@ -151,15 +156,16 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app.json
-          git commit -m "chore(release): ${VERSION} [skip ci]"
+          git commit -m "chore(release): ${TAG} [skip ci]"
 
-          if git ls-remote --tags origin "refs/tags/${VERSION}" | grep -q "refs/tags/${VERSION}"; then
-            git push origin ":refs/tags/${VERSION}"
-            echo "Deleted existing remote tag ${VERSION}"
-          fi
-          git tag -f "${VERSION}"
-          git push origin "${VERSION}"
-          echo "Created and pushed tag ${VERSION} with version ${BARE}"
+          # Push the bump to the branch first: if main moved since checkout the
+          # push is rejected and we fail here, before any tag is created.
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+          # The epoch suffix makes each tag unique, so there is no tag to replace.
+          git tag "${TAG}"
+          git push origin "${TAG}"
+          echo "Pushed version bump to ${GITHUB_REF_NAME} and tag ${TAG} (version ${VERSION}, versionCode ${VERSION_CODE})"
 
   # ---------------------------------------------------------------------------
   # Manual dispatch only: build APK and publish release (runs after create-tag)
@@ -180,18 +186,6 @@ jobs:
         with:
           ref: ${{ needs.create-tag.outputs.checkout_ref }}
 
-      - name: Delete existing release if present
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          RELEASE_TAG="${{ needs.create-tag.outputs.release_tag }}"
-          if gh release view "${RELEASE_TAG}" &>/dev/null; then
-            echo "Deleting existing release ${RELEASE_TAG}..."
-            gh release delete "${RELEASE_TAG}" --yes
-          else
-            echo "No existing release for ${RELEASE_TAG}"
-          fi
-
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
@@ -210,22 +204,21 @@ jobs:
       - name: Set app.json version for build
         run: |
           # Belt-and-suspenders: the tag created above already carries the bump,
-          # but re-releasing an OLD tag (created before that step existed) would
-          # not, so inject version + versionCode here too. Idempotent for new tags.
+          # but injecting version + versionCode here too is harmless and keeps the
+          # build correct even if the checked-out ref somehow lacks it.
           VERSION="${{ needs.create-tag.outputs.version }}"
-          BARE="${VERSION#v}"
+          VERSION_CODE="${{ needs.create-tag.outputs.version_code }}"
           node -e "
             const fs = require('fs');
             const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
-            app.expo.version = '${BARE}';
-            const [maj, min, pat] = '${BARE}'.split('.').map(Number);
+            app.expo.version = '${VERSION}';
             app.expo.android = {
               ...(app.expo.android || {}),
-              versionCode: maj * 10000 + min * 100 + pat,
+              versionCode: ${VERSION_CODE},
             };
             fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\n');
           "
-          echo "Set app.json version to ${BARE} (versionCode from ${BARE})"
+          echo "Set app.json version to ${VERSION} (versionCode ${VERSION_CODE})"
 
       - name: Cache Expo prebuild
         uses: actions/cache@v4
@@ -266,16 +259,18 @@ jobs:
 
       - name: Compose release notes
         run: |
-          # create-tag already guaranteed the v-prefixed changelog exists, so use
-          # it directly (no bare-name or minimal-note fallback).
-          VERSION="${{ needs.create-tag.outputs.version }}"
+          # create-tag already guaranteed the base-version changelog exists, so
+          # use it directly (no bare-name or minimal-note fallback). The link
+          # pins the file at the release tag, which carries the bump commit.
+          CHANGELOG_VERSION="${{ needs.create-tag.outputs.changelog_version }}"
+          RELEASE_TAG="${{ needs.create-tag.outputs.release_tag }}"
           REPO="${{ github.repository }}"
-          CHANGELOG="changelogs/${VERSION}.md"
+          CHANGELOG="changelogs/${CHANGELOG_VERSION}.md"
           if [ ! -f "$CHANGELOG" ]; then
             echo "::error::Missing ${CHANGELOG} at the build ref."
             exit 1
           fi
-          LINK="**Changelog:** [${CHANGELOG}](https://github.com/${REPO}/blob/${VERSION}/${CHANGELOG})"
+          LINK="**Changelog:** [${CHANGELOG}](https://github.com/${REPO}/blob/${RELEASE_TAG}/${CHANGELOG})"
           printf '%s\n' "$LINK" > /tmp/release-notes.md
 
       - name: Publish release to its-a-rock

@@ -22,12 +22,14 @@ RepoType: git
 Repo: https://github.com/rajwalgautam/its-a-rock.git
 
 Builds:
-  - versionName: 1.5.2
-    # versionCode = MAJOR*10000 + MINOR*100 + PATCH, committed onto the tag by the
-    # release workflow. Point this at the first tag cut AFTER the workflow change
-    # landed; earlier tags were built with versionCode 1. See docs/fdroid.md.
-    versionCode: 10502
-    commit: v1.5.2
+  # PLACEHOLDER: point this at the first tag cut after the epoch-suffix release
+  # scheme landed (tag/versionName look like v1.5.4-1751999999 and versionCode
+  # is the epoch, committed onto the tag by the release workflow). Earlier tags
+  # were built with versionCode 1 or MAJOR*10000+MINOR*100+PATCH codes; do not
+  # use them. See docs/fdroid.md.
+  - versionName: X.Y.Z-EPOCH
+    versionCode: EPOCH
+    commit: vX.Y.Z-EPOCH
     sudo:
       - apt-get update
       - apt-get install -y nodejs npm
@@ -41,6 +43,7 @@ Builds:
     output: android/app/build/outputs/apk/release/app-release.apk
 
 AutoUpdateMode: Version v%v
-UpdateCheckMode: Tags ^v[0-9.]+$
-CurrentVersion: 1.5.2
-CurrentVersionCode: 10502
+# Release tags carry a unix-time build suffix, e.g. v1.5.4-1751999999.
+UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+-[0-9]+$
+CurrentVersion: X.Y.Z-EPOCH
+CurrentVersionCode: EPOCH

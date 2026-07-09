@@ -1,4 +1,4 @@
-import { formatLastChecked, isNewerVersion } from '@/utils/versionCompare';
+import { baseVersion, formatLastChecked, isNewerVersion } from '@/utils/versionCompare';
 
 describe('isNewerVersion', () => {
   it('treats higher patch as newer', () => {
@@ -43,8 +43,31 @@ describe('isNewerVersion', () => {
     expect(isNewerVersion('0.2.3-9', '0.2.4')).toBe(false);
   });
 
+  it('orders unix-time build suffixes from the release workflow', () => {
+    expect(isNewerVersion('0.1.9-1752000000', '0.1.9-1751000000')).toBe(true);
+    expect(isNewerVersion('0.1.9-1751000000', '0.1.9-1752000000')).toBe(false);
+    expect(isNewerVersion('0.1.9-1752000000', '0.1.9')).toBe(true);
+    expect(isNewerVersion('0.2.0-1751000000', '0.1.9-1752000000')).toBe(true);
+  });
+
   it('treats a non-numeric suffix (e.g. -rerelease) as equal to the base', () => {
     expect(isNewerVersion('0.2.3-rerelease', '0.2.3')).toBe(false);
+  });
+});
+
+describe('baseVersion', () => {
+  it('strips a leading v and the unix-time build suffix', () => {
+    expect(baseVersion('v1.5.3-1751999999')).toBe('1.5.3');
+    expect(baseVersion('1.5.3-1751999999')).toBe('1.5.3');
+  });
+
+  it('strips a legacy -rerelease suffix', () => {
+    expect(baseVersion('v1.5.3-rerelease')).toBe('1.5.3');
+  });
+
+  it('leaves a plain base version untouched', () => {
+    expect(baseVersion('v1.5.3')).toBe('1.5.3');
+    expect(baseVersion('1.5.3')).toBe('1.5.3');
   });
 });
 
