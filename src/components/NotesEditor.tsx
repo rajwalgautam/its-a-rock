@@ -43,6 +43,11 @@ export function emptyDraft(): NoteDraft {
   return { id: null, key: freshKey(), body: '', mediaUri: null, mediaType: null, hasPlan: false };
 }
 
+/** A blank note card — no text and no attached media. */
+export function isEmptyDraft(n: NoteDraft): boolean {
+  return n.body.trim().length === 0 && n.mediaUri === null;
+}
+
 /**
  * The form's notes section: a stack of note cards plus an "Add note" button.
  * Each card has a text field; an empty card offers "Use Favorite" / "Add Media",
@@ -63,6 +68,9 @@ export function NotesEditor({
   }
 
   function addNote(): void {
+    // Never stack blank cards: if one is already open, leave it as the single
+    // empty note to fill in rather than appending another.
+    if (notes.some(isEmptyDraft)) return;
     onChange([...notes, emptyDraft()]);
   }
 

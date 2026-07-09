@@ -22,7 +22,7 @@ import { useRouteStore } from '@/store/useRouteStore';
 import { GradePicker } from '@/components/GradePicker';
 import { MediaGalleryField } from '@/components/MediaGalleryField';
 import { LocationPickerField } from '@/components/LocationPickerField';
-import { NotesEditor, emptyDraft, type NoteDraft } from '@/components/NotesEditor';
+import { NotesEditor, emptyDraft, isEmptyDraft, type NoteDraft } from '@/components/NotesEditor';
 import { formatDate } from '@/utils/formatters';
 import { startOfDayMs } from '@/utils/dateUtils';
 import { validateRouteInput } from '@/utils/validators';
@@ -58,9 +58,10 @@ interface FormState {
   completedAt: number | null;
 }
 
-/** Build editor drafts from a route's persisted notes. */
+/** Build editor drafts from a route's persisted notes, keeping at most one blank
+ * card (legacy climbs may carry several empty notes; collapse them to one). */
 function notesToDrafts(notes: RouteNote[]): NoteDraft[] {
-  return notes.map((n) => ({
+  const drafts = notes.map((n) => ({
     id: n.id,
     key: `note-existing-${n.id}`,
     body: n.body ?? '',
@@ -68,6 +69,13 @@ function notesToDrafts(notes: RouteNote[]): NoteDraft[] {
     mediaType: n.media?.type ?? null,
     hasPlan: n.hasPlan,
   }));
+  let seenEmpty = false;
+  return drafts.filter((n) => {
+    if (!isEmptyDraft(n)) return true;
+    if (seenEmpty) return false;
+    seenEmpty = true;
+    return true;
+  });
 }
 
 function toState(
@@ -86,7 +94,7 @@ function toState(
         : (initialMedia ?? []),
     grade: initial?.grade ?? null,
     completed: initial?.completed ?? false,
-    notes: startWithNewNote ? [...notes, emptyDraft()] : notes,
+    notes: startWithNewNote && !notes.some(isEmptyDraft) ? [...notes, emptyDraft()] : notes,
     startedAt: initial?.startedAt ?? null,
     completedAt: initial?.completedAt ?? null,
   };
@@ -214,15 +222,18 @@ export function RouteForm({
   /** Persist the form, then open the planner for the given note's media. */
   async function handlePlanNote(key: string, mode: PlanMode): Promise<void> {
     if (onPersistDraft === undefined) return;
-    const input = toInput(state, { dropEmpty: false });
+    // Persist only meaningful notes so blank drafts aren't saved and then
+    // reloaded as clutter. The planned note has media, so it survives the
+    // filter; resolve its index against that same filtered list.
+    const targetIndex = state.notes.filter(isMeaningful).findIndex((n) => n.key === key);
+    if (targetIndex < 0) return;
+    const input = toInput(state, { dropEmpty: true });
     const result = validateRouteInput(input);
     if (!result.valid) {
       setErrors(result.errors);
       return;
     }
     setErrors({});
-    const targetIndex = state.notes.findIndex((n) => n.key === key);
-    if (targetIndex < 0) return;
     setSaving(true);
     try {
       if (state.gymName.length > 0) setLastLocationName(state.gymName);
@@ -256,7 +267,9 @@ export function RouteForm({
       );
       return;
     }
-    const input = toInput(state, { dropEmpty: false });
+    // Drop blank drafts so they aren't persisted and reloaded as clutter; the
+    // plan note we append below carries media, so it's kept.
+    const input = toInput(state, { dropEmpty: true });
     const result = validateRouteInput(input);
     if (!result.valid) {
       setErrors(result.errors);
