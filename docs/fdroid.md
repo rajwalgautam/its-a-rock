@@ -60,20 +60,20 @@ F-Droid requires each published APK to have a **unique, monotonically increasing
 `versionCode`**, and it must be correct **at the git tag** (F-Droid builds from
 the tag, not from CI).
 
-The release workflow handles this: for a normal release it derives both values
-from the dispatched tag and **commits them onto the tagged commit** — so checking
-out `v1.5.2` yields an `app.json` with `version: "1.5.2"` and
-`android.versionCode: 10502`. See
+The release workflow handles this: it suffixes every release with the unix time
+of the dispatch and **commits both values onto the tagged commit** — so checking
+out `v1.5.2-1751999999` yields an `app.json` with `version: "1.5.2-1751999999"`
+and `android.versionCode: 1751999999`. See
 [`docs/releasing.md`](releasing.md#versioning). The scheme is:
 
 ```
-versionCode = MAJOR * 10000 + MINOR * 100 + PATCH
-# v1.5.2 -> 10502
+versionCode = unix time of the release dispatch
+# v1.5.2-1751999999 -> 1751999999
 ```
 
-The [recipe](../fdroid/com.itsarock.app.yml) and the fastlane changelog file
-([`changelogs/10502.txt`](../fastlane/metadata/android/en-US/changelogs/10502.txt))
-match this scheme.
+The [recipe](../fdroid/com.itsarock.app.yml) and the fastlane changelog files
+(`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`) must use these
+epoch version codes.
 
 > **Note on existing tags:** tags released *before* this change (≤ v1.5.x) were
 > built with `versionCode 1` and a stale `versionName`. Point the recipe's first

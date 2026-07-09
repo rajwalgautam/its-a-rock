@@ -8,7 +8,7 @@ import {
 } from "expo-file-system/legacy";
 import * as IntentLauncher from "expo-intent-launcher";
 import { Linking, Platform } from "react-native";
-import { isNewerVersion } from "./versionCompare";
+import { baseVersion, isNewerVersion } from "./versionCompare";
 import { stripUnderTheHood } from "./changelog";
 
 export { formatLastChecked, isNewerVersion } from "./versionCompare";
@@ -22,7 +22,10 @@ export const releasesUrl = `https://github.com/${RELEASES_REPO}/releases`;
 /** Raw changelog file for a tag — the single source of user-facing notes. */
 export const changelogRawUrl = (version: string): string => {
   const v = version.replace(/^v/, "");
-  return `https://raw.githubusercontent.com/${RELEASES_REPO}/v${v}/changelogs/v${v}.md`;
+  // Changelogs are keyed to the base version: the release workflow suffixes
+  // every tag/app version with a unix-time build number ("1.5.3-1751999999",
+  // legacy "-rerelease"), but the file is still changelogs/v1.5.3.md at that tag.
+  return `https://raw.githubusercontent.com/${RELEASES_REPO}/v${v}/changelogs/v${baseVersion(v)}.md`;
 };
 
 const STORAGE_KEYS = {

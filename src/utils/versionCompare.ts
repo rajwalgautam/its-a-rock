@@ -18,6 +18,15 @@ export function isNewerVersion(remote: string, current: string): boolean {
   return false;
 }
 
+/**
+ * Strip a leading "v" and any release build suffix ("-<epoch>" or the legacy
+ * "-rerelease") to get the base semver, e.g. "v1.5.3-1751999999" -> "1.5.3".
+ * Releases carry a unix-time suffix, but the changelog file is keyed to the base.
+ */
+export function baseVersion(v: string): string {
+  return v.replace(/^v/, "").replace(/-(?:\d+|rerelease)$/, "");
+}
+
 export function formatLastChecked(date: Date | null): string {
   if (date === null) return "Never checked";
   const dateStr = date.toLocaleDateString(undefined, {
