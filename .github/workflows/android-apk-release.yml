@@ -55,7 +55,7 @@ jobs:
       CI: true
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
@@ -90,7 +90,7 @@ jobs:
       changelog_version: ${{ steps.resolve.outputs.changelog_version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           # Push over SSH as the release deploy key, which has a bypass on the
           # "Protect main" ruleset — the default GITHUB_TOKEN cannot push to main.
@@ -182,7 +182,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.create-tag.outputs.checkout_ref }}
 
