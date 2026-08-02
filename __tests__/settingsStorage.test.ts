@@ -21,6 +21,7 @@ describe('settingsStorage', () => {
       limbColorLeft: '#2563EB',
       limbColorRight: '#DC2626',
       notesLayout: 'grid',
+      plansLayout: 'stacked',
       gradeSystem: 'French',
     });
     expect(await loadSettings()).toEqual({
@@ -33,6 +34,7 @@ describe('settingsStorage', () => {
       limbColorLeft: '#2563EB',
       limbColorRight: '#DC2626',
       notesLayout: 'grid',
+      plansLayout: 'stacked',
       gradeSystem: 'French',
     });
   });

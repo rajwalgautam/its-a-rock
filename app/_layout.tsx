@@ -56,6 +56,7 @@ function Navigator(): React.JSX.Element {
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="history" options={{ title: 'History' }} />
       <Stack.Screen name="routes/new" options={{ title: 'Add a climb', presentation: 'modal' }} />
       <Stack.Screen name="routes/[id]" options={{ title: 'Climb' }} />
       <Stack.Screen name="plan/[routeId]" options={{ title: 'Plan route' }} />

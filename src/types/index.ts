@@ -210,6 +210,25 @@ export interface RoutePlan {
   updatedAt: number;
 }
 
+/**
+ * A single move plan surfaced on the Plans tab. Carries just enough to render a
+ * card (the plan's photo and move count) plus the climb it belongs to for
+ * grade/gym/status context, and the ids needed to open it in the planner.
+ */
+export interface PlanSummary {
+  planId: number;
+  routeId: number;
+  /** The note the plan is attached to, or null for a legacy route-level plan. */
+  noteId: number | null;
+  /** Number of moves in the plan (always >= 1 — empty plans are excluded). */
+  moveCount: number;
+  /** The plan's photo (the note's media), falling back to the climb's cover. */
+  photoUri: string | null;
+  updatedAt: number;
+  /** The climb this plan belongs to, for card context and stacking. */
+  route: RouteWithGym;
+}
+
 // ---- History tab filtering & sorting ----
 
 export type HistoryCompletion = 'all' | 'completed' | 'projects';
@@ -256,3 +275,9 @@ export type ColumnDensity = 1 | 2 | 3 | 4;
 
 /** How a route's notes are laid out on the detail card. */
 export type NotesLayout = 'rows' | 'grid';
+
+/**
+ * How the Plans tab groups plans: `individual` shows one card per plan;
+ * `stacked` groups a climb's plans into a single stacked card.
+ */
+export type PlansLayout = 'individual' | 'stacked';

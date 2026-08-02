@@ -18,6 +18,7 @@ import type {
   RouteNote,
   RouteNoteInput,
   RoutePlan,
+  PlanSummary,
   RouteWithGym,
 } from '@/types';
 
@@ -590,6 +591,57 @@ async function getPlanMoves(planId: number): Promise<PlanMove[]> {
     [planId],
   );
   return rows.map(mapPlanMove);
+}
+
+interface PlanSummaryRow extends RouteJoinRow {
+  plan_id: number;
+  note_id: number | null;
+  plan_updated_at: number;
+  media_uri: string | null;
+  move_count: number;
+}
+
+/**
+ * Every plan that has at least one move, newest first, each joined to its climb
+ * (and gym) and its photo. Powers the Plans tab; one row per plan, so a climb
+ * with several planned notes yields several rows.
+ */
+export async function getPlans(): Promise<PlanSummary[]> {
+  const db = getDatabase();
+  const rows = await db.getAllAsync<PlanSummaryRow>(
+    `SELECT
+       r.id, r.name, r.gym_id, r.photo_uri, r.photo_width, r.photo_height,
+       r.grade, r.completed, r.notes, r.started_at, r.completed_at,
+       r.created_at, r.updated_at,
+       g.name            AS gym_name,
+       g.normalized_name AS gym_normalized_name,
+       g.created_at      AS gym_created_at,
+       g.updated_at      AS gym_updated_at,
+       p.id         AS plan_id,
+       p.note_id    AS note_id,
+       p.updated_at AS plan_updated_at,
+       m.uri        AS media_uri,
+       COUNT(mv.id) AS move_count
+     FROM route_plans p
+     JOIN plan_moves mv ON mv.plan_id = p.id
+     JOIN routes r ON r.id = p.route_id
+     JOIN gyms g ON g.id = r.gym_id
+     LEFT JOIN route_media m ON m.id = p.media_id
+     GROUP BY p.id
+     ORDER BY p.updated_at DESC, p.id DESC`,
+  );
+  return rows.map((row) => {
+    const route = mapRoute(row);
+    return {
+      planId: row.plan_id,
+      routeId: row.id,
+      noteId: row.note_id,
+      moveCount: row.move_count,
+      photoUri: row.media_uri ?? route.photoUri,
+      updatedAt: row.plan_updated_at,
+      route,
+    };
+  });
 }
 
 export async function getPlanById(id: number): Promise<RoutePlan | null> {

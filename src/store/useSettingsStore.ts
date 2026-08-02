@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ColumnDensity, GradeSystem, NotesLayout, ThemeMode } from '@/types';
+import type { ColumnDensity, GradeSystem, NotesLayout, PlansLayout, ThemeMode } from '@/types';
 import {
   DEFAULT_SETTINGS,
   loadSettings,
@@ -20,6 +20,7 @@ interface SettingsState extends Settings {
   setLimbColorLeft: (value: string) => void;
   setLimbColorRight: (value: string) => void;
   setNotesLayout: (value: NotesLayout) => void;
+  setPlansLayout: (value: PlansLayout) => void;
   setGradeSystem: (value: GradeSystem) => void;
 }
 
@@ -34,6 +35,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   limbColorLeft: DEFAULT_SETTINGS.limbColorLeft,
   limbColorRight: DEFAULT_SETTINGS.limbColorRight,
   notesLayout: DEFAULT_SETTINGS.notesLayout,
+  plansLayout: DEFAULT_SETTINGS.plansLayout,
   gradeSystem: DEFAULT_SETTINGS.gradeSystem,
   isLoaded: false,
 
@@ -92,6 +94,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     void persist(get);
   },
 
+  setPlansLayout: (value) => {
+    set({ plansLayout: value });
+    void persist(get);
+  },
+
   setGradeSystem: (value) => {
     set({ gradeSystem: value });
     void persist(get);
@@ -110,6 +117,7 @@ function persist(get: () => SettingsState): Promise<void> {
     limbColorLeft,
     limbColorRight,
     notesLayout,
+    plansLayout,
     gradeSystem,
   } = get();
   return saveSettings({
@@ -123,6 +131,7 @@ function persist(get: () => SettingsState): Promise<void> {
     limbColorLeft,
     limbColorRight,
     notesLayout,
+    plansLayout,
     gradeSystem,
   });
 }

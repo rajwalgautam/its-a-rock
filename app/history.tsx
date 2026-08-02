@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { FONT_SIZE, SPACING } from '@/constants/theme';
@@ -67,7 +66,7 @@ export default function History(): React.JSX.Element {
   );
 
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]} edges={['top']}>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
       <RouteGrid
         routes={visibleRoutes}
         onTilePress={openRoute}
@@ -82,7 +81,7 @@ export default function History(): React.JSX.Element {
         onDismiss={() => setMenuVisible(false)}
         onEdit={(route) => router.push(`/routes/${route.id}`)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
