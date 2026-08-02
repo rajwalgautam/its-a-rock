@@ -170,6 +170,14 @@ export interface PlanMove {
    * uncommitted hold. It does not affect sequence, grouping, or playback.
    */
   floating: boolean;
+  /**
+   * Manual center-of-mass override for this move's frame, in normalized [0,1]
+   * coordinates. Stored on the move that closes a frame (its last member); null
+   * means the frame uses the auto-calculated centroid of its stance. Only the
+   * frame-closing move's value is read.
+   */
+  comX: number | null;
+  comY: number | null;
   /** 0-based, contiguous order within the plan. */
   sequence: number;
   createdAt: number;
@@ -183,6 +191,8 @@ export interface PlanMoveInput {
   y: number;
   groupId?: number | null;
   floating?: boolean;
+  comX?: number | null;
+  comY?: number | null;
 }
 
 /** An ordered sequence of moves drawn on one photo of a route. */

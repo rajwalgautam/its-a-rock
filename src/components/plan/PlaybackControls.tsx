@@ -6,6 +6,7 @@ import { runOnJS } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { LIMB_NAME } from '@/constants/limbs';
+import { PLAYBACK_SPEEDS } from '@/constants/plan';
 import { useTheme } from '@/theme/ThemeProvider';
 import type { Limb } from '@/types';
 
@@ -18,16 +19,26 @@ interface PlaybackControlsProps {
   total: number;
   /** Limbs that move on this step (one for a solo move, several for a frame). */
   movingLimbs: Limb[];
+  /** Whether the autoplay slideshow is running. */
+  isAutoPlaying: boolean;
+  /** Index into `PLAYBACK_SPEEDS` for the current autoplay speed. */
+  speedIndex: number;
   onStep: (step: number) => void;
+  onToggleAutoPlay: () => void;
+  onSpeedChange: (index: number) => void;
   onExit: () => void;
 }
 
-/** Bottom playback bar: scrub track, prev/next, and a current-move caption. */
+/** Bottom playback bar: scrub track, play/pause, prev/next, speed, caption. */
 export function PlaybackControls({
   step,
   total,
   movingLimbs,
+  isAutoPlaying,
+  speedIndex,
   onStep,
+  onToggleAutoPlay,
+  onSpeedChange,
   onExit,
 }: PlaybackControlsProps): React.JSX.Element {
   const { colors } = useTheme();
@@ -67,9 +78,15 @@ export function PlaybackControls({
           disabled={step <= 0}
           onPress={() => onStep(step - 1)}
         />
-        <Text style={[styles.counter, { color: colors.textSecondary }]}>
-          {step} / {total}
-        </Text>
+        <Pressable
+          onPress={onToggleAutoPlay}
+          accessibilityRole="button"
+          accessibilityLabel={isAutoPlaying ? 'Pause playback' : 'Play route'}
+          hitSlop={8}
+          style={[styles.playBtn, { backgroundColor: colors.primary }]}
+        >
+          <Ionicons name={isAutoPlaying ? 'pause' : 'play'} size={26} color={colors.onPrimary} />
+        </Pressable>
         <StepButton
           icon="play-forward"
           label="Next move"
@@ -77,6 +94,50 @@ export function PlaybackControls({
           onPress={() => onStep(step + 1)}
         />
       </View>
+
+      <View style={styles.speedRow}>
+        <Text style={[styles.counter, { color: colors.textSecondary }]}>
+          {step} / {total}
+        </Text>
+        <SpeedControl speedIndex={speedIndex} onSpeedChange={onSpeedChange} />
+      </View>
+    </View>
+  );
+}
+
+/** A compact Slow / Normal / Fast segmented control for the autoplay speed. */
+function SpeedControl({
+  speedIndex,
+  onSpeedChange,
+}: {
+  speedIndex: number;
+  onSpeedChange: (index: number) => void;
+}): React.JSX.Element {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.speedTrack, { backgroundColor: colors.surfaceAlt }]}>
+      {PLAYBACK_SPEEDS.map((s, i) => {
+        const active = i === speedIndex;
+        return (
+          <Pressable
+            key={s.label}
+            onPress={() => onSpeedChange(i)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={`${s.label} playback speed`}
+            style={[styles.speedSeg, active && { backgroundColor: colors.primary }]}
+          >
+            <Text
+              style={[
+                styles.speedText,
+                { color: active ? colors.onPrimary : colors.textSecondary },
+              ]}
+            >
+              {s.label}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -215,5 +276,31 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  playBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: RADIUS.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  speedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  speedTrack: {
+    flexDirection: 'row',
+    borderRadius: RADIUS.full,
+    padding: 2,
+  },
+  speedSeg: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.full,
+  },
+  speedText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
   },
 });

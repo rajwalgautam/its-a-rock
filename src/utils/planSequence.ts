@@ -22,6 +22,13 @@ export interface DraftMove {
   groupId: number | null;
   /** Visual-only flag: greyed out to mark an optional/uncommitted hold. */
   floating: boolean;
+  /**
+   * Manual center-of-mass override for this move's frame (normalized [0,1]), or
+   * null to use the auto-calculated centroid. Only read on the move that closes
+   * a frame (its last member). See `comOverrideAt`/`setCurrentCom`.
+   */
+  comX: number | null;
+  comY: number | null;
 }
 
 /** Build editable moves from a persisted plan (keys are the row ids). */
@@ -34,6 +41,8 @@ export function fromPlan(plan: RoutePlan): DraftMove[] {
     holdId: m.holdId,
     groupId: m.groupId,
     floating: m.floating,
+    comX: m.comX,
+    comY: m.comY,
   }));
 }
 
@@ -46,6 +55,8 @@ export function toInputs(moves: DraftMove[]): PlanMoveInput[] {
     holdId: m.holdId,
     groupId: m.groupId,
     floating: m.floating,
+    comX: m.comX,
+    comY: m.comY,
   }));
 }
 
@@ -293,4 +304,47 @@ export function movingLimbsAt(moves: DraftMove[], frameStep: number): Limb[] {
   const frames = framesOf(moves);
   if (frameStep <= 0 || frameStep > frames.length) return [];
   return frames[frameStep - 1]!.map((m) => m.limb);
+}
+
+/**
+ * The centroid of the currently-placed limbs — the plan's "center of mass" —
+ * or null when no limb is placed (e.g. playback step 0). Every placed limb is
+ * weighted equally (no torso bias), so it's the plain average of their points.
+ */
+export function computeCenterOfMass(stance: LimbStance): Point | null {
+  const pts = LIMB_ORDER.map((l) => stance[l]).filter((p): p is Point => p !== null);
+  if (pts.length === 0) return null;
+  const sum = pts.reduce((a, p) => ({ x: a.x + p.x, y: a.y + p.y }), { x: 0, y: 0 });
+  return { x: sum.x / pts.length, y: sum.y / pts.length };
+}
+
+/**
+ * The manual center-of-mass override for frame `frameStep` (1-based), read from
+ * the move that closes that frame, or null when the frame has none (so callers
+ * fall back to `computeCenterOfMass`). Null outside the frame range.
+ */
+export function comOverrideAt(moves: DraftMove[], frameStep: number): Point | null {
+  const frames = framesOf(moves);
+  if (frameStep <= 0 || frameStep > frames.length) return null;
+  const frame = frames[frameStep - 1]!;
+  const closing = frame[frame.length - 1]!;
+  if (closing.comX === null || closing.comY === null) return null;
+  return { x: closing.comX, y: closing.comY };
+}
+
+/**
+ * Set the manual CoM override on the current frame — i.e. on the last move in
+ * the sequence, which closes the final frame. No-op on an empty plan.
+ */
+export function setCurrentCom(moves: DraftMove[], x: number, y: number): DraftMove[] {
+  if (moves.length === 0) return moves;
+  const last = moves.length - 1;
+  return moves.map((m, i) => (i === last ? { ...m, comX: x, comY: y } : m));
+}
+
+/** Clear the current frame's CoM override, reverting it to the auto centroid. */
+export function clearCurrentCom(moves: DraftMove[]): DraftMove[] {
+  if (moves.length === 0) return moves;
+  const last = moves.length - 1;
+  return moves.map((m, i) => (i === last ? { ...m, comX: null, comY: null } : m));
 }

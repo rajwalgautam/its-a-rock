@@ -1,16 +1,20 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 import { useTheme } from '@/theme/ThemeProvider';
 import { toNormalized, toScreen, type Point } from '@/utils/coords';
-import { imageLayout } from '@/utils/imageLayout';
+import { imageLayout, type ImageRect } from '@/utils/imageLayout';
 import { LimbMarker } from '@/components/plan/LimbMarker';
+import { LIMB_ORDER } from '@/constants/limbs';
 import type { Limb } from '@/types';
 
 export interface CanvasMarker {
@@ -34,6 +38,8 @@ export interface CanvasMarker {
   current?: boolean;
   /** Dim the marker (a superseded, non-current placement). */
   muted?: boolean;
+  /** Contributes to the center-of-mass centroid (a current-stance limb). */
+  comMember?: boolean;
 }
 
 /** Radius (image px) around a marker within which a tap selects rather than places. */
@@ -56,10 +62,19 @@ interface PlanCanvasProps {
   /** Opacity for the limb bubbles/badges (user-configurable transparency). */
   bubbleOpacity?: number;
   selectedKey?: string | null;
+  /**
+   * Manual center-of-mass override for the current/shown frame (normalized), or
+   * null to show the auto-calculated centroid of the current stance.
+   */
+  centerOfMass?: Point | null;
   onPlace?: (norm: Point) => void;
   onSelectMarker?: (key: string) => void;
   onCommitMarker?: (key: string, norm: Point) => void;
   onToggleFloating?: (key: string) => void;
+  /** Commit a dragged center-of-mass position (normalized) as a frame override. */
+  onCommitCom?: (norm: Point) => void;
+  /** Reset the current frame's center of mass back to the auto centroid. */
+  onClearCom?: () => void;
 }
 
 /**
@@ -77,10 +92,13 @@ export function PlanCanvas({
   bubbleScale = 1,
   bubbleOpacity = 1,
   selectedKey = null,
+  centerOfMass = null,
   onPlace,
   onSelectMarker,
   onCommitMarker,
   onToggleFloating,
+  onCommitCom,
+  onClearCom,
 }: PlanCanvasProps): React.JSX.Element {
   const { colors } = useTheme();
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -88,6 +106,38 @@ export function PlanCanvas({
     () => imageLayout(size.w, size.h, imgW, imgH),
     [size.w, size.h, imgW, imgH],
   );
+
+  // Live screen positions of the four limbs, mirrored from their markers, so the
+  // center of mass is derived on the UI thread (tracking drags and glides).
+  const lhX = useSharedValue(0);
+  const lhY = useSharedValue(0);
+  const rhX = useSharedValue(0);
+  const rhY = useSharedValue(0);
+  const lfX = useSharedValue(0);
+  const lfY = useSharedValue(0);
+  const rfX = useSharedValue(0);
+  const rfY = useSharedValue(0);
+  const liveX: Record<Limb, SharedValue<number>> = { LH: lhX, RH: rhX, LF: lfX, RF: rfX };
+  const liveY: Record<Limb, SharedValue<number>> = { LH: lhY, RH: rhY, LF: lfY, RF: rfY };
+
+  // The limbs that make up the current stance (one marker each). The center of
+  // mass is the centroid of these; it needs at least two to be meaningful.
+  const comLimbs = LIMB_ORDER.filter((l) => markers.some((m) => m.limb === l && m.comMember === true));
+  const showCom = layout.displayedW > 0 && comLimbs.length >= 2;
+  const comTargets = comLimbs.map((l) => ({ x: liveX[l], y: liveY[l] }));
+
+  // Centroid of the current-stance limbs, recomputed on the UI thread whenever
+  // any of their live positions changes. Null until at least two are placed.
+  const autoCom = useDerivedValue<Point | null>(() => {
+    if (comTargets.length < 2) return null;
+    let sx = 0;
+    let sy = 0;
+    for (const t of comTargets) {
+      sx += t.x.value;
+      sy += t.y.value;
+    }
+    return { x: sx / comTargets.length, y: sy / comTargets.length };
+  });
 
   // Zoom/pan transform of the content layer. With `transformOrigin: top-left`
   // the mapping is a plain affine — screen = translate + scale * local — so a
@@ -229,6 +279,8 @@ export function PlanCanvas({
                   bubbleScale={bubbleScale}
                   bubbleOpacity={bubbleOpacity}
                   scale={scale}
+                  liveX={m.comMember === true ? liveX[m.limb] : undefined}
+                  liveY={m.comMember === true ? liveY[m.limb] : undefined}
                   onSelect={() => onSelectMarker?.(m.key)}
                   onCommit={(norm) => onCommitMarker?.(m.key, norm)}
                   onToggleFloating={
@@ -236,6 +288,22 @@ export function PlanCanvas({
                   }
                 />
               ))}
+            {showCom && (
+              <CenterOfMass
+                autoCom={autoCom}
+                override={centerOfMass}
+                targets={comTargets}
+                layout={layout}
+                color={colors.planCom}
+                editable={editable}
+                animated={animatedMarkers}
+                bubbleScale={bubbleScale}
+                bubbleOpacity={bubbleOpacity}
+                scale={scale}
+                onCommit={onCommitCom}
+                onClear={onClearCom}
+              />
+            )}
           </Animated.View>
         </View>
       </GestureDetector>
@@ -283,6 +351,195 @@ function Connector({ a, b, color }: { a: Point; b: Point; color: string }): Reac
   return <>{dots}</>;
 }
 
+/** 44dp touch target for the CoM dot, matching the limb markers' a11y minimum. */
+const COM_TOUCH = 44;
+const COM_DOT = 22;
+
+interface CenterOfMassProps {
+  /** UI-thread centroid of the current stance (null until two limbs are placed). */
+  autoCom: SharedValue<Point | null>;
+  /** Manual override for the current/shown frame (normalized), or null for auto. */
+  override: Point | null;
+  /** Live screen positions of the limbs the dotted lines connect to. */
+  targets: { x: SharedValue<number>; y: SharedValue<number> }[];
+  layout: ImageRect;
+  color: string;
+  /** Edit mode: the dot can be held-then-dragged and double-tapped to reset. */
+  editable: boolean;
+  /** Play mode: glide the dot between frames like the limb markers. */
+  animated: boolean;
+  bubbleScale: number;
+  bubbleOpacity: number;
+  scale: SharedValue<number>;
+  onCommit?: (norm: Point) => void;
+  onClear?: () => void;
+}
+
+/**
+ * The green center-of-mass dot with dotted lines radiating to each limb. Its
+ * position is, in priority order, the live drag, the frame's manual override, or
+ * the auto centroid — so it tracks limb drags live, sits where the climber put
+ * it when overridden, and glides between frames during playback. It carries no
+ * limb glyph and wears a ring so it never reads as the (also green) left hand.
+ */
+function CenterOfMass({
+  autoCom,
+  override,
+  targets,
+  layout,
+  color,
+  editable,
+  animated,
+  bubbleScale,
+  bubbleOpacity,
+  scale,
+  onCommit,
+  onClear,
+}: CenterOfMassProps): React.JSX.Element {
+  const dotSize = COM_DOT * bubbleScale;
+  const touchSize = Math.max(COM_TOUCH, dotSize + 12);
+
+  // The override, animated so it glides between frames in playback. Kept in sync
+  // by the effect below; read by `pos` when an override is present.
+  const ovX = useSharedValue(0);
+  const ovY = useSharedValue(0);
+  // The live drag position while the dot is being moved.
+  const dragX = useSharedValue(0);
+  const dragY = useSharedValue(0);
+  const dragging = useSharedValue(false);
+  const hasOverride = override !== null;
+
+  useEffect(() => {
+    if (override !== null) {
+      const s = toScreen(override, layout);
+      if (animated) {
+        ovX.value = withTiming(s.x, { duration: 280 });
+        ovY.value = withTiming(s.y, { duration: 280 });
+      } else {
+        ovX.value = s.x;
+        ovY.value = s.y;
+      }
+    }
+    // A committed/cleared override has landed in props, so end any drag hold
+    // without the position snapping back to the centroid for a frame.
+    dragging.value = false;
+  }, [override, layout, animated, ovX, ovY, dragging]);
+
+  // The dot's live screen position: drag wins, then override, then auto centroid.
+  const pos = useDerivedValue<Point | null>(() => {
+    if (dragging.value) return { x: dragX.value, y: dragY.value };
+    if (hasOverride) return { x: ovX.value, y: ovY.value };
+    return autoCom.value;
+  });
+
+  function commit(sx: number, sy: number): void {
+    onCommit?.(toNormalized({ x: sx, y: sy }, layout));
+  }
+
+  function liftHaptic(): void {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }
+
+  const pan = Gesture.Pan()
+    .enabled(editable && onCommit !== undefined)
+    .activateAfterLongPress(300)
+    .onStart(() => {
+      const p = pos.value;
+      if (p !== null) {
+        dragX.value = p.x;
+        dragY.value = p.y;
+      }
+      dragging.value = true;
+      runOnJS(liftHaptic)();
+    })
+    .onChange((e) => {
+      const s = scale.value;
+      dragX.value += e.changeX / s;
+      dragY.value += e.changeY / s;
+    })
+    .onEnd(() => {
+      // Leave `dragging` true until the committed override arrives via props (the
+      // effect clears it), so the dot holds its spot instead of flashing back.
+      runOnJS(commit)(dragX.value, dragY.value);
+    });
+
+  const doubleTap = Gesture.Tap()
+    .enabled(editable && onClear !== undefined)
+    .numberOfTaps(2)
+    .maxDistance(20)
+    .onEnd(() => {
+      if (onClear) runOnJS(onClear)();
+    });
+
+  const gesture = Gesture.Race(pan, doubleTap);
+
+  const dotStyle = useAnimatedStyle(() => {
+    const p = pos.value;
+    if (p === null) return { opacity: 0, left: -9999, top: -9999 };
+    return {
+      opacity: bubbleOpacity,
+      left: p.x - touchSize / 2,
+      top: p.y - touchSize / 2,
+    };
+  });
+
+  return (
+    <>
+      {targets.map((t, i) => (
+        <ComConnector key={i} com={pos} tx={t.x} ty={t.y} color={color} />
+      ))}
+      <GestureDetector gesture={gesture}>
+        <Animated.View
+          style={[styles.comTouch, { width: touchSize, height: touchSize }, dotStyle]}
+          accessibilityRole="button"
+          accessibilityLabel="Center of mass"
+          accessibilityHint={editable ? 'Hold and drag to adjust; double-tap to reset' : undefined}
+        >
+          <View
+            style={[
+              styles.comDot,
+              {
+                width: dotSize,
+                height: dotSize,
+                borderRadius: dotSize / 2,
+                backgroundColor: color,
+              },
+            ]}
+          />
+        </Animated.View>
+      </GestureDetector>
+    </>
+  );
+}
+
+/** A straight dashed line from the (animated) CoM point to a limb's live point. */
+function ComConnector({
+  com,
+  tx,
+  ty,
+  color,
+}: {
+  com: SharedValue<Point | null>;
+  tx: SharedValue<number>;
+  ty: SharedValue<number>;
+  color: string;
+}): React.JSX.Element {
+  const style = useAnimatedStyle(() => {
+    const c = com.value;
+    if (c === null) return { opacity: 0, width: 0 };
+    const dx = tx.value - c.x;
+    const dy = ty.value - c.y;
+    return {
+      opacity: 0.9,
+      left: c.x,
+      top: c.y,
+      width: Math.hypot(dx, dy),
+      transform: [{ rotateZ: `${Math.atan2(dy, dx)}rad` }],
+    };
+  });
+  return <Animated.View pointerEvents="none" style={[styles.comLine, { borderTopColor: color }, style]} />;
+}
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
@@ -294,6 +551,26 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     opacity: 0.85,
+  },
+  comTouch: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // No limb glyph; a white ring + green fill (and the radiating lines) keep it
+  // distinct from the green left-hand marker.
+  comDot: {
+    borderColor: '#FFFFFF',
+    borderWidth: 2.5,
+  },
+  // A 0-height view whose dashed top border is the line; rotated about its left
+  // end (the CoM point) to aim at a limb.
+  comLine: {
+    position: 'absolute',
+    height: 0,
+    borderTopWidth: 2,
+    borderStyle: 'dashed',
+    transformOrigin: 'top left',
   },
   // Top-left origin makes the zoom transform a plain affine (see above).
   content: {

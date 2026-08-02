@@ -51,7 +51,7 @@ export async function initDatabase(): Promise<void> {
 }
 
 /** Latest schema version; bump and add a branch in runMigrations per change. */
-const LATEST_SCHEMA_VERSION = 5;
+const LATEST_SCHEMA_VERSION = 6;
 
 /**
  * Apply pending schema migrations, tracked by SQLite's `user_version`. Fresh
@@ -85,6 +85,11 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   if (version < 5) {
     await migrateToV5(db);
     version = 5;
+  }
+
+  if (version < 6) {
+    await migrateToV6(db);
+    version = 6;
   }
 
   if (version !== LATEST_SCHEMA_VERSION) version = LATEST_SCHEMA_VERSION;
@@ -178,6 +183,24 @@ async function migrateToV5(db: SQLite.SQLiteDatabase): Promise<void> {
   const cols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(plan_moves)');
   if (!cols.some((c) => c.name === 'floating')) {
     await db.execAsync('ALTER TABLE plan_moves ADD COLUMN floating INTEGER NOT NULL DEFAULT 0');
+  }
+}
+
+/**
+ * v6: an adjustable center of mass. Nullable `com_x`/`com_y` on `plan_moves`
+ * hold a manual CoM override (normalized [0,1]) for the move's frame; null means
+ * the frame uses the auto-calculated centroid (the pre-v6 behaviour). The value
+ * is only meaningful on the move that closes a frame. Existing moves default to
+ * NULL, so older plans load with a fully auto CoM. `ADD COLUMN` isn't
+ * idempotent, so guard on the existing columns.
+ */
+async function migrateToV6(db: SQLite.SQLiteDatabase): Promise<void> {
+  const cols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(plan_moves)');
+  if (!cols.some((c) => c.name === 'com_x')) {
+    await db.execAsync('ALTER TABLE plan_moves ADD COLUMN com_x REAL');
+  }
+  if (!cols.some((c) => c.name === 'com_y')) {
+    await db.execAsync('ALTER TABLE plan_moves ADD COLUMN com_y REAL');
   }
 }
 
