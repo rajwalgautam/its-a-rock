@@ -3,6 +3,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { LIMB_ICON, LIMB_ICON_FLIP, LIMB_NAME, LIMB_ORDER, limbColor } from '@/constants/limbs';
 import { useTheme } from '@/theme/ThemeProvider';
+import { useSettingsStore } from '@/store/useSettingsStore';
+import { contrastColor } from '@/utils/color';
 import type { Limb } from '@/types';
 
 interface LimbSelectorProps {
@@ -19,11 +21,18 @@ export function LimbSelector({
   limbs = LIMB_ORDER,
 }: LimbSelectorProps): React.JSX.Element {
   const { colors } = useTheme();
+  const limbSides = {
+    left: useSettingsStore((s) => s.limbColorLeft),
+    right: useSettingsStore((s) => s.limbColorRight),
+  };
 
   return (
     <View style={styles.row}>
       {limbs.map((limb) => {
-        const color = limbColor(colors, limb);
+        const color = limbColor(limbSides, limb);
+        // The chip is always filled with the actual marker color (so the swatch
+        // is visible even when it's white), the glyph drawn in whichever of
+        // black/white reads on it, and the active limb gets a primary ring.
         const isActive = limb === active;
         return (
           <Pressable
@@ -37,13 +46,17 @@ export function LimbSelector({
             <View
               style={[
                 styles.chip,
-                { borderColor: color, backgroundColor: isActive ? color : 'transparent' },
+                {
+                  backgroundColor: color,
+                  borderColor: isActive ? colors.primary : colors.border,
+                  borderWidth: isActive ? 3 : 1,
+                },
               ]}
             >
               <MaterialCommunityIcons
                 name={LIMB_ICON[limb]}
                 size={24}
-                color={isActive ? '#FFFFFF' : color}
+                color={contrastColor(color)}
                 style={LIMB_ICON_FLIP[limb] ? styles.flip : undefined}
               />
             </View>
@@ -74,7 +87,6 @@ const styles = StyleSheet.create({
     width: 52,
     height: 36,
     borderRadius: RADIUS.full,
-    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -2,13 +2,16 @@ import { useEffect, useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { IN_APP_UPDATES_ENABLED } from '@/constants/features';
 import { FONT_SIZE, RADIUS, SHADOW, SPACING } from '@/constants/theme';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { GRADE_SYSTEMS, GRADE_SYSTEM_ORDER } from '@/constants/grades';
+import { LIMB_COLOR_CHOICES } from '@/constants/plan';
+import { LIMB_ICON, LIMB_ICON_FLIP } from '@/constants/limbs';
+import { contrastColor } from '@/utils/color';
 import { LocationsManager } from '@/components/LocationsManager';
 import {
   downloadAndInstallApk,
@@ -33,6 +36,10 @@ export default function Settings(): React.JSX.Element {
   const setMuteVideosByDefault = useSettingsStore((s) => s.setMuteVideosByDefault);
   const gradeSystem = useSettingsStore((s) => s.gradeSystem);
   const setGradeSystem = useSettingsStore((s) => s.setGradeSystem);
+  const limbColorLeft = useSettingsStore((s) => s.limbColorLeft);
+  const setLimbColorLeft = useSettingsStore((s) => s.setLimbColorLeft);
+  const limbColorRight = useSettingsStore((s) => s.limbColorRight);
+  const setLimbColorRight = useSettingsStore((s) => s.setLimbColorRight);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [checking, setChecking] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
@@ -132,6 +139,25 @@ export default function Settings(): React.JSX.Element {
           </Text>
         </View>
 
+        <SectionLabel label="Route planner" />
+        <View style={[styles.card, { backgroundColor: colors.surface }, SHADOW.sm]}>
+          <LimbColorPicker
+            label="Left hand & foot"
+            hint="Marker color for both left-side limbs"
+            limb="LH"
+            value={limbColorLeft}
+            onChange={setLimbColorLeft}
+          />
+          <View style={[styles.divider, { backgroundColor: colors.border, marginVertical: SPACING.md }]} />
+          <LimbColorPicker
+            label="Right hand & foot"
+            hint="Marker color for both right-side limbs"
+            limb="RH"
+            value={limbColorRight}
+            onChange={setLimbColorRight}
+          />
+        </View>
+
         <SectionLabel label="Logging" />
         <View style={[styles.card, { backgroundColor: colors.surface }, SHADOW.sm]}>
           <View style={styles.row}>
@@ -220,6 +246,64 @@ function SectionLabel({ label }: { label: string }): React.JSX.Element {
   return <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>{label}</Text>;
 }
 
+/**
+ * A labeled row of color swatches for one side's limb marker color. Each swatch
+ * previews the limb glyph in the black/white that will contrast against it, so
+ * the climber sees exactly how the marker will read before picking.
+ */
+function LimbColorPicker({
+  label,
+  hint,
+  limb,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  limb: 'LH' | 'RH';
+  value: string;
+  onChange: (color: string) => void;
+}): React.JSX.Element {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.pickerBlock}>
+      <View style={styles.rowText}>
+        <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>{label}</Text>
+        <Text style={[styles.rowHint, { color: colors.textMuted }]}>{hint}</Text>
+      </View>
+      <View style={styles.swatchRow}>
+        {LIMB_COLOR_CHOICES.map((choice) => {
+          const selected = choice.toLowerCase() === value.toLowerCase();
+          return (
+            <Pressable
+              key={choice}
+              onPress={() => onChange(choice)}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              accessibilityLabel={`${label}, color ${choice}`}
+              style={[
+                styles.swatch,
+                {
+                  backgroundColor: choice,
+                  borderColor: selected ? colors.primary : colors.border,
+                  borderWidth: selected ? 3 : 1,
+                },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={LIMB_ICON[limb]}
+                size={18}
+                color={contrastColor(choice)}
+                style={LIMB_ICON_FLIP[limb] ? styles.flip : undefined}
+              />
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
@@ -280,6 +364,24 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     marginVertical: SPACING.xs,
+  },
+  pickerBlock: {
+    gap: SPACING.sm,
+  },
+  swatchRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+  },
+  swatch: {
+    width: 44,
+    height: 34,
+    borderRadius: RADIUS.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flip: {
+    transform: [{ scaleX: -1 }],
   },
   lastChecked: {
     fontSize: FONT_SIZE.sm,

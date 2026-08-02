@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -12,6 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SPACING } from '@/constants/theme';
 import { LIMB_ICON, LIMB_ICON_FLIP, LIMB_NAME } from '@/constants/limbs';
+import { contrastColor, luminance } from '@/utils/color';
 import { toNormalized, toScreen, type Point } from '@/utils/coords';
 import type { ImageRect } from '@/utils/imageLayout';
 import type { Limb } from '@/types';
@@ -118,13 +119,24 @@ export function LimbMarker({
   // Current-stance ring: a thin accent halo sitting just outside the dot.
   const ringGap = Math.max(2, Math.round(3 * bubbleScale));
   const ringWidth = Math.max(1.5, Math.round(2 * bubbleScale));
+  // The dot's color is user-chosen (per side), so the glyph and the solid
+  // outline take whichever of black/white reads on it. The badge keeps its white
+  // pill but darkens its number when the limb color is too pale to show.
+  const glyphColor = contrastColor(color);
+  const badgeFg = luminance(color) > 0.7 ? '#111111' : color;
 
   const screen = toScreen({ x, y }, layout);
   const posX = useSharedValue(screen.x);
   const posY = useSharedValue(screen.y);
+  // Only glide once the marker has an established position. A limb entering the
+  // stance mid-playback mounts fresh, and its shared `liveX`/`liveY` mirrors
+  // still carry a stale (or zero) value from before — gliding to the new spot
+  // would sweep the center-of-mass dot and its connector in from the corner. So
+  // the first placement lands instantly and only later moves animate.
+  const primed = useRef(false);
 
   useEffect(() => {
-    if (animated) {
+    if (animated && primed.current) {
       posX.value = withTiming(screen.x, { duration: 280 });
       posY.value = withTiming(screen.y, { duration: 280 });
       if (liveX) liveX.value = withTiming(screen.x, { duration: 280 });
@@ -135,6 +147,7 @@ export function LimbMarker({
       if (liveX) liveX.value = screen.x;
       if (liveY) liveY.value = screen.y;
     }
+    primed.current = true;
   }, [screen.x, screen.y, animated, posX, posY, liveX, liveY]);
 
   function commit(sx: number, sy: number): void {
@@ -220,8 +233,10 @@ export function LimbMarker({
               height: dotSize,
               borderRadius: dotSize / 2,
               backgroundColor: color,
-              // Floating markers keep their color but wear a dashed black border.
-              borderColor: floating ? '#000000' : '#FFFFFF',
+              // Floating markers keep their color but wear a dashed black border;
+              // otherwise the solid outline contrasts with the chosen color so a
+              // white bubble still has a visible edge.
+              borderColor: floating ? '#000000' : glyphColor,
               borderStyle: floating ? 'dashed' : 'solid',
               borderWidth: selected ? (compact ? 2.5 : 3) : floating ? 2 : 1.5,
             },
@@ -246,7 +261,7 @@ export function LimbMarker({
           <MaterialCommunityIcons
             name={LIMB_ICON[limb]}
             size={iconSize}
-            color="#FFFFFF"
+            color={glyphColor}
             style={LIMB_ICON_FLIP[limb] ? styles.flip : undefined}
           />
           {/* Anchored to the dot (not the larger touch box) so it stays pinned
@@ -259,13 +274,13 @@ export function LimbMarker({
                   minWidth: badgeSize,
                   height: badgeSize,
                   borderRadius: badgeSize / 2,
-                  borderColor: color,
+                  borderColor: badgeFg,
                 },
               ]}
             >
               <Text
                 numberOfLines={1}
-                style={[styles.badgeText, { color, fontSize: badgeFont }]}
+                style={[styles.badgeText, { color: badgeFg, fontSize: badgeFont }]}
               >
                 {badge}
               </Text>

@@ -2,10 +2,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   DEFAULT_BUBBLE_OPACITY,
   DEFAULT_BUBBLE_SCALE,
+  DEFAULT_LIMB_COLOR_LEFT,
+  DEFAULT_LIMB_COLOR_RIGHT,
   MAX_BUBBLE_OPACITY,
   MAX_BUBBLE_SCALE,
   MIN_BUBBLE_OPACITY,
   MIN_BUBBLE_SCALE,
+  validLimbColor,
 } from '@/constants/plan';
 import type { ColumnDensity, GradeSystem, NotesLayout, ThemeMode } from '@/types';
 
@@ -23,6 +26,10 @@ export interface Settings {
   bubbleScale: number;
   /** Opacity (1 = opaque) for the route planner's limb bubbles/badges. */
   bubbleOpacity: number;
+  /** Marker color for the left-side limbs (left hand + left foot), as hex. */
+  limbColorLeft: string;
+  /** Marker color for the right-side limbs (right hand + right foot), as hex. */
+  limbColorRight: string;
   /** How a climb's notes are laid out on the detail card. */
   notesLayout: NotesLayout;
   /** Which grading system the grade picker presents (default V-scale). */
@@ -37,6 +44,8 @@ export const DEFAULT_SETTINGS: Settings = {
   muteVideosByDefault: true,
   bubbleScale: DEFAULT_BUBBLE_SCALE,
   bubbleOpacity: DEFAULT_BUBBLE_OPACITY,
+  limbColorLeft: DEFAULT_LIMB_COLOR_LEFT,
+  limbColorRight: DEFAULT_LIMB_COLOR_RIGHT,
   notesLayout: 'rows',
   gradeSystem: 'V',
 };
@@ -86,6 +95,8 @@ export async function loadSettings(): Promise<Settings> {
         : DEFAULT_SETTINGS.muteVideosByDefault,
     bubbleScale: validBubbleScale(parsed.bubbleScale),
     bubbleOpacity: validBubbleOpacity(parsed.bubbleOpacity),
+    limbColorLeft: validLimbColor(parsed.limbColorLeft, DEFAULT_SETTINGS.limbColorLeft),
+    limbColorRight: validLimbColor(parsed.limbColorRight, DEFAULT_SETTINGS.limbColorRight),
     notesLayout: VALID_NOTES_LAYOUTS.includes(parsed.notesLayout as NotesLayout)
       ? (parsed.notesLayout as NotesLayout)
       : DEFAULT_SETTINGS.notesLayout,

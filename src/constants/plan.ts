@@ -88,6 +88,35 @@ export const PLAYBACK_SPEEDS: readonly PlaybackSpeed[] = [
   { label: 'Slow', intervalMs: 2200 },
   { label: 'Normal', intervalMs: 1300 },
   { label: 'Fast', intervalMs: 700 },
+  { label: 'Turbo', intervalMs: 400 },
 ];
 
 export const DEFAULT_PLAYBACK_SPEED_INDEX = 1;
+
+/**
+ * The swatches offered when choosing the left/right limb marker colors. The
+ * hand/foot glyph is drawn in black or white per swatch (whichever contrasts),
+ * so both the near-black and near-white ends stay legible.
+ */
+export const LIMB_COLOR_CHOICES = [
+  '#111111',
+  '#FFFFFF',
+  '#16A34A',
+  '#2563EB',
+  '#D97706',
+  '#9333EA',
+  '#DC2626',
+  '#0EA5E9',
+] as const;
+
+/**
+ * Default limb marker colors: left is a black bubble with a white glyph, right a
+ * white bubble with a black glyph — a high-contrast pair that reads at a glance.
+ */
+export const DEFAULT_LIMB_COLOR_LEFT = '#111111';
+export const DEFAULT_LIMB_COLOR_RIGHT = '#FFFFFF';
+
+/** Coerce an untrusted stored value to a usable hex color, else the fallback. */
+export function validLimbColor(value: unknown, fallback: string): string {
+  return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value : fallback;
+}
