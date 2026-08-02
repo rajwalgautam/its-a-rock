@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
@@ -41,7 +41,22 @@ export default function MyClimbing(): React.JSX.Element {
   const header = (
     <View style={styles.header}>
       <UpdateBanner />
-      <Text style={[styles.title, { color: colors.textPrimary, fontSize: FONT_SIZE.xxl }]}>This week</Text>
+      <View style={styles.titleRow}>
+        <Text style={[styles.title, { color: colors.textPrimary, fontSize: FONT_SIZE.xxl }]}>This week</Text>
+        <Pressable
+          onPress={() => router.push('/history')}
+          accessibilityRole="button"
+          accessibilityLabel="View climb history"
+          hitSlop={8}
+          style={({ pressed }) => [
+            styles.historyBtn,
+            { backgroundColor: colors.surfaceAlt, opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <Ionicons name="time-outline" size={16} color={colors.textPrimary} />
+          <Text style={[styles.historyText, { color: colors.textPrimary }]}>History</Text>
+        </Pressable>
+      </View>
       <View style={styles.statsRow}>
         <StatCard label="Visits" value={String(stats?.visits ?? 0)} />
         <StatCard label="Sends" value={String(stats?.completedThisWeek ?? 0)} accentColor={colors.success} />
@@ -96,9 +111,26 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     marginBottom: SPACING.sm,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   title: {
     fontSize: FONT_SIZE.xl,
     fontWeight: '800',
+  },
+  historyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: 999,
+  },
+  historyText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
   },
   statsRow: {
     flexDirection: 'row',

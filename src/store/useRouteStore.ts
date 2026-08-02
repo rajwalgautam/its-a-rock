@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Gym, RouteInput, RouteWithGym, WeeklyStats } from '@/types';
+import type { Gym, PlanSummary, RouteInput, RouteWithGym, WeeklyStats } from '@/types';
 import {
   countRoutesForGym,
   createGym,
@@ -7,6 +7,7 @@ import {
   deleteGym,
   deleteRoute,
   getGyms,
+  getPlans,
   getProjects,
   getRouteById,
   getRoutes,
@@ -19,12 +20,14 @@ import { computeWeeklyStats } from '@/utils/routeStats';
 interface RouteState {
   routes: RouteWithGym[];
   projects: RouteWithGym[];
+  plans: PlanSummary[];
   gyms: Gym[];
   weeklyStats: WeeklyStats | null;
   isLoading: boolean;
   error: string | null;
   loadRoutes: () => Promise<void>;
   loadProjects: () => Promise<void>;
+  loadPlans: () => Promise<void>;
   loadGyms: () => Promise<void>;
   loadWeeklyStats: () => Promise<void>;
   getRoute: (id: number) => Promise<RouteWithGym | null>;
@@ -41,6 +44,7 @@ interface RouteState {
 export const useRouteStore = create<RouteState>((set, get) => ({
   routes: [],
   projects: [],
+  plans: [],
   gyms: [],
   weeklyStats: null,
   isLoading: false,
@@ -61,6 +65,16 @@ export const useRouteStore = create<RouteState>((set, get) => ({
     try {
       const projects = await getProjects();
       set({ projects });
+    } catch (e) {
+      set({ error: errMessage(e) });
+    }
+  },
+
+  loadPlans: async () => {
+    set({ error: null });
+    try {
+      const plans = await getPlans();
+      set({ plans });
     } catch (e) {
       set({ error: errMessage(e) });
     }
@@ -130,7 +144,7 @@ export const useRouteStore = create<RouteState>((set, get) => ({
 
   clearAll: async () => {
     await resetAllData();
-    set({ routes: [], projects: [], gyms: [], weeklyStats: computeWeeklyStats([]) });
+    set({ routes: [], projects: [], plans: [], gyms: [], weeklyStats: computeWeeklyStats([]) });
   },
 }));
 
@@ -139,6 +153,7 @@ async function refresh(get: () => RouteState): Promise<void> {
   await Promise.all([
     get().loadRoutes(),
     get().loadProjects(),
+    get().loadPlans(),
     get().loadGyms(),
     get().loadWeeklyStats(),
   ]);

@@ -28,20 +28,20 @@ export default function TabsLayout(): React.JSX.Element {
       }}
     >
       <Tabs.Screen
+        name="plans"
+        options={{
+          title: 'Plans',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'footsteps' : 'footsteps-outline'} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="index"
         options={{
           title: 'My Climbing',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'hand-right' : 'hand-right-outline'} size={24} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: 'History',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'time' : 'time-outline'} size={24} color={color} />
           ),
         }}
       />
