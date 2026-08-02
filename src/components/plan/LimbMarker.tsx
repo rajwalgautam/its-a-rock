@@ -59,6 +59,14 @@ interface LimbMarkerProps {
    * divided by this to move the marker the right amount in image space.
    */
   scale?: SharedValue<number>;
+  /**
+   * Optional shared values the marker mirrors its live screen position into, so
+   * the canvas can derive the center of mass on the UI thread — tracking drags
+   * and playback glides without a React round-trip. Only wired for the markers
+   * that contribute to the center of mass (the current stance).
+   */
+  liveX?: SharedValue<number>;
+  liveY?: SharedValue<number>;
   onSelect?: () => void;
   /** Called with the new normalized position when a drag ends. */
   onCommit?: (norm: Point) => void;
@@ -93,6 +101,8 @@ export function LimbMarker({
   bubbleScale = 1,
   bubbleOpacity = 1,
   scale,
+  liveX,
+  liveY,
   onSelect,
   onCommit,
   onToggleFloating,
@@ -117,11 +127,15 @@ export function LimbMarker({
     if (animated) {
       posX.value = withTiming(screen.x, { duration: 280 });
       posY.value = withTiming(screen.y, { duration: 280 });
+      if (liveX) liveX.value = withTiming(screen.x, { duration: 280 });
+      if (liveY) liveY.value = withTiming(screen.y, { duration: 280 });
     } else {
       posX.value = screen.x;
       posY.value = screen.y;
+      if (liveX) liveX.value = screen.x;
+      if (liveY) liveY.value = screen.y;
     }
-  }, [screen.x, screen.y, animated, posX, posY]);
+  }, [screen.x, screen.y, animated, posX, posY, liveX, liveY]);
 
   function commit(sx: number, sy: number): void {
     onCommit?.(toNormalized({ x: sx, y: sy }, layout));
@@ -152,6 +166,8 @@ export function LimbMarker({
       const s = scale ? scale.value : 1;
       posX.value += e.changeX / s;
       posY.value += e.changeY / s;
+      if (liveX) liveX.value = posX.value;
+      if (liveY) liveY.value = posY.value;
     })
     .onEnd(() => {
       runOnJS(commit)(posX.value, posY.value);

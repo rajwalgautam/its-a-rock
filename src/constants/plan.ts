@@ -73,3 +73,21 @@ export function stepBubbleOpacity(value: number, dir: -1 | 1): number {
   const next = Math.max(0, Math.min(BUBBLE_OPACITIES.length - 1, i + dir));
   return BUBBLE_OPACITIES[next]!;
 }
+
+/**
+ * Autoplay speeds for the playback slideshow: how long each frame is held before
+ * advancing. Comfortably longer than the 280ms marker glide so a move finishes
+ * settling before the next begins. `Normal` is the default.
+ */
+export interface PlaybackSpeed {
+  label: string;
+  intervalMs: number;
+}
+
+export const PLAYBACK_SPEEDS: readonly PlaybackSpeed[] = [
+  { label: 'Slow', intervalMs: 2200 },
+  { label: 'Normal', intervalMs: 1300 },
+  { label: 'Fast', intervalMs: 700 },
+];
+
+export const DEFAULT_PLAYBACK_SPEED_INDEX = 1;

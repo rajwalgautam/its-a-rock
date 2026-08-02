@@ -541,6 +541,8 @@ interface PlanMoveRow {
   y: number;
   group_id: number | null;
   floating: number;
+  com_x: number | null;
+  com_y: number | null;
   sequence: number;
   created_at: number;
 }
@@ -561,6 +563,8 @@ function mapPlanMove(row: PlanMoveRow): PlanMove {
     y: row.y,
     groupId: row.group_id,
     floating: row.floating === 1,
+    comX: row.com_x,
+    comY: row.com_y,
     sequence: row.sequence,
     createdAt: row.created_at,
   };
@@ -668,9 +672,21 @@ export async function savePlanMoves(planId: number, moves: PlanMoveInput[]): Pro
     for (let i = 0; i < moves.length; i++) {
       const m = moves[i]!;
       await db.runAsync(
-        `INSERT INTO plan_moves (plan_id, limb, hold_id, x, y, group_id, floating, sequence, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [planId, m.limb, m.holdId ?? null, m.x, m.y, m.groupId ?? null, m.floating ? 1 : 0, i, now],
+        `INSERT INTO plan_moves (plan_id, limb, hold_id, x, y, group_id, floating, com_x, com_y, sequence, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          planId,
+          m.limb,
+          m.holdId ?? null,
+          m.x,
+          m.y,
+          m.groupId ?? null,
+          m.floating ? 1 : 0,
+          m.comX ?? null,
+          m.comY ?? null,
+          i,
+          now,
+        ],
       );
     }
     await db.runAsync('UPDATE route_plans SET updated_at = ? WHERE id = ?', [now, planId]);
@@ -732,9 +748,21 @@ export async function duplicateNotePlan(routeId: number, noteId: number): Promis
       );
       for (const mv of moves) {
         await db.runAsync(
-          `INSERT INTO plan_moves (plan_id, limb, hold_id, x, y, group_id, floating, sequence, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [newPlanId, mv.limb, mv.hold_id, mv.x, mv.y, mv.group_id, mv.floating, mv.sequence, now],
+          `INSERT INTO plan_moves (plan_id, limb, hold_id, x, y, group_id, floating, com_x, com_y, sequence, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            newPlanId,
+            mv.limb,
+            mv.hold_id,
+            mv.x,
+            mv.y,
+            mv.group_id,
+            mv.floating,
+            mv.com_x,
+            mv.com_y,
+            mv.sequence,
+            now,
+          ],
         );
       }
     }

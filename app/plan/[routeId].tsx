@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -12,7 +12,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { FONT_SIZE, SPACING } from '@/constants/theme';
-import { limbsForMode, parsePlanMode } from '@/constants/plan';
+import {
+  DEFAULT_PLAYBACK_SPEED_INDEX,
+  PLAYBACK_SPEEDS,
+  limbsForMode,
+  parsePlanMode,
+} from '@/constants/plan';
 import { LIMB_NAME, LIMB_ORDER, limbColor } from '@/constants/limbs';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useRouteStore } from '@/store/useRouteStore';
@@ -26,6 +31,8 @@ import { PlaybackControls } from '@/components/plan/PlaybackControls';
 import {
   addToFrame,
   appendMove,
+  clearCurrentCom,
+  comOverrideAt,
   currentStanceKeys,
   frameStanceAt,
   framesOf,
@@ -38,6 +45,7 @@ import {
   removeFromFrame,
   removeMove,
   reorderFrames,
+  setCurrentCom,
   toggleFloating,
   toInputs,
   updateMovePosition,
@@ -118,6 +126,8 @@ export default function RoutePlanScreen(): React.JSX.Element {
   const [helpOpen, setHelpOpen] = useState(false);
   const [mode, setMode] = useState<'edit' | 'play'>('edit');
   const [step, setStep] = useState(0);
+  const [autoPlaying, setAutoPlaying] = useState(false);
+  const [speedIndex, setSpeedIndex] = useState(DEFAULT_PLAYBACK_SPEED_INDEX);
   const [canUndo, setCanUndo] = useState(false);
   const tempCounter = useRef(0);
   // Mirrors `moves` so handlers always read the latest array, immune to the
@@ -243,6 +253,8 @@ export default function RoutePlanScreen(): React.JSX.Element {
       holdId: null,
       groupId: seeding ? null : groupId,
       floating: false,
+      comX: null,
+      comY: null,
     };
     const next = appendMove(movesRef.current, move);
     if (seeding) setActiveLimb(nextSeedLimb(activeLimb, next, limbOrder));
@@ -251,6 +263,17 @@ export default function RoutePlanScreen(): React.JSX.Element {
 
   function handleCommitMarker(key: string, norm: Point): void {
     void commitMoves(updateMovePosition(movesRef.current, key, norm.x, norm.y));
+  }
+
+  /** Persist a dragged center-of-mass as the current frame's override. */
+  function handleCommitCom(norm: Point): void {
+    void commitMoves(setCurrentCom(movesRef.current, norm.x, norm.y));
+  }
+
+  /** Reset the current frame's center of mass back to the auto centroid. */
+  function handleClearCom(): void {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    void commitMoves(clearCurrentCom(movesRef.current));
   }
 
   function handleToggleFloating(key: string): void {
@@ -290,13 +313,51 @@ export default function RoutePlanScreen(): React.JSX.Element {
   function enterPlay(): void {
     if (moves.length === 0) return;
     setListOpen(false);
+    setAutoPlaying(false);
     setStep(1);
     setMode('play');
+  }
+
+  function exitPlay(): void {
+    setAutoPlaying(false);
+    setMode('edit');
   }
 
   function setPlayStep(next: number): void {
     setStep(Math.max(0, Math.min(next, frames.length)));
   }
+
+  /** A manual scrub/step from the user, which also pauses autoplay. */
+  function handleUserStep(next: number): void {
+    setAutoPlaying(false);
+    setPlayStep(next);
+  }
+
+  /** Toggle the autoplay slideshow, restarting from the top if at the end. */
+  function toggleAutoPlay(): void {
+    if (autoPlaying) {
+      setAutoPlaying(false);
+      return;
+    }
+    if (step >= frames.length) setStep(0);
+    setAutoPlaying(true);
+  }
+
+  // Autoplay: hold each frame for the chosen interval, then advance. Re-armed per
+  // step (and on speed change); stops itself at the last frame. The timer is
+  // cleared on unmount, pause, or leaving play mode by the effect cleanup.
+  useEffect(() => {
+    if (!autoPlaying || mode !== 'play') return;
+    if (step >= frames.length) {
+      setAutoPlaying(false);
+      return;
+    }
+    const id = setTimeout(
+      () => setStep((s) => Math.min(s + 1, frames.length)),
+      PLAYBACK_SPEEDS[speedIndex]!.intervalMs,
+    );
+    return () => clearTimeout(id);
+  }, [autoPlaying, mode, step, frames.length, speedIndex]);
 
   if (state.status !== 'ready') {
     return (
@@ -324,6 +385,12 @@ export default function RoutePlanScreen(): React.JSX.Element {
   const safeStep = Math.min(step, frames.length);
   const movingLimbs = playing ? movingLimbsAt(moves, safeStep) : [];
 
+  // The center-of-mass override to display: the shown frame's in play mode, the
+  // current (last) frame's while editing. Null falls back to the auto centroid.
+  const comOverride = playing
+    ? comOverrideAt(moves, safeStep)
+    : comOverrideAt(moves, frames.length);
+
   let markers: CanvasMarker[];
   if (playing) {
     const stance = frameStanceAt(moves, safeStep);
@@ -336,6 +403,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
       color: limbColor(colors, l),
       badge: null,
       highlighted: moving.has(l),
+      comMember: true,
     }));
   } else {
     // Markers stay small dots so they barely cover the holds; the sequence
@@ -355,6 +423,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
       floating: m.floating,
       current: stanceKeys.has(m.key),
       muted: !stanceKeys.has(m.key),
+      comMember: stanceKeys.has(m.key),
     }));
   }
 
@@ -385,10 +454,13 @@ export default function RoutePlanScreen(): React.JSX.Element {
           bubbleScale={bubbleScale}
           bubbleOpacity={bubbleOpacity}
           selectedKey={playing ? null : selectedKey}
+          centerOfMass={comOverride}
           onPlace={handlePlace}
           onSelectMarker={setSelectedKey}
           onCommitMarker={handleCommitMarker}
           onToggleFloating={handleToggleFloating}
+          onCommitCom={handleCommitCom}
+          onClearCom={handleClearCom}
         />
         {!playing && (seeding || grouping) && (
           <View style={styles.hint} pointerEvents="none">
@@ -418,8 +490,12 @@ export default function RoutePlanScreen(): React.JSX.Element {
           step={safeStep}
           total={frames.length}
           movingLimbs={movingLimbs}
-          onStep={setPlayStep}
-          onExit={() => setMode('edit')}
+          isAutoPlaying={autoPlaying}
+          speedIndex={speedIndex}
+          onStep={handleUserStep}
+          onToggleAutoPlay={toggleAutoPlay}
+          onSpeedChange={setSpeedIndex}
+          onExit={exitPlay}
         />
       ) : (
         <PlanEditBar

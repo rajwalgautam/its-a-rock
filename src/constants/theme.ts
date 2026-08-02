@@ -43,6 +43,12 @@ export interface Palette {
   limbRH: string;
   limbLF: string;
   limbRF: string;
+  /**
+   * The planner's center-of-mass dot. A vivid spring green kept deliberately
+   * brighter than `limbLH` (also green) so the icon-less, ringed CoM dot with
+   * its radiating dashed lines never reads as a left-hand marker.
+   */
+  planCom: string;
 }
 
 export const LIGHT: Palette = {
@@ -69,6 +75,7 @@ export const LIGHT: Palette = {
   limbRH: '#2563EB',
   limbLF: '#D97706',
   limbRF: '#9333EA',
+  planCom: '#00C853',
 };
 
 export const DARK: Palette = {
@@ -95,6 +102,7 @@ export const DARK: Palette = {
   limbRH: '#3B82F6',
   limbLF: '#F59E0B',
   limbRF: '#A855F7',
+  planCom: '#00E676',
 };
 
 export const SPACING = {

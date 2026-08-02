@@ -20,7 +20,7 @@ import {
 import type { Limb } from '@/types';
 
 function move(key: string, limb: Limb = 'LH', groupId: number | null = null): DraftMove {
-  return { key, limb, x: 0.5, y: 0.5, holdId: null, groupId, floating: false };
+  return { key, limb, x: 0.5, y: 0.5, holdId: null, groupId, floating: false, comX: null, comY: null };
 }
 
 const keys = (moves: DraftMove[]): string[] => moves.map((m) => m.key);
@@ -76,12 +76,12 @@ describe('updateMovePosition', () => {
 describe('toInputs', () => {
   it('strips editor keys and preserves order + fields', () => {
     const moves: DraftMove[] = [
-      { key: 'a', limb: 'RH', x: 0.2, y: 0.3, holdId: 7, groupId: 1, floating: false },
-      { key: 'b', limb: 'LF', x: 0.8, y: 0.9, holdId: null, groupId: null, floating: true },
+      { key: 'a', limb: 'RH', x: 0.2, y: 0.3, holdId: 7, groupId: 1, floating: false, comX: null, comY: null },
+      { key: 'b', limb: 'LF', x: 0.8, y: 0.9, holdId: null, groupId: null, floating: true, comX: 0.5, comY: 0.6 },
     ];
     expect(toInputs(moves)).toEqual([
-      { limb: 'RH', x: 0.2, y: 0.3, holdId: 7, groupId: 1, floating: false },
-      { limb: 'LF', x: 0.8, y: 0.9, holdId: null, groupId: null, floating: true },
+      { limb: 'RH', x: 0.2, y: 0.3, holdId: 7, groupId: 1, floating: false, comX: null, comY: null },
+      { limb: 'LF', x: 0.8, y: 0.9, holdId: null, groupId: null, floating: true, comX: 0.5, comY: 0.6 },
     ]);
   });
 });
