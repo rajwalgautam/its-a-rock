@@ -41,6 +41,14 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
     });
   }
 
+  /** Open a note's plan straight into an autoplaying slideshow. */
+  function playNotePlan(note: RouteNote): void {
+    router.push({
+      pathname: '/plan/[routeId]',
+      params: { routeId: String(current.id), noteId: String(note.id), autoplay: '1' },
+    });
+  }
+
   /** Copy a note + its plan, then reload so the duplicate appears in the list. */
   async function handleDuplicatePlan(note: RouteNote): Promise<void> {
     const newNoteId = await duplicatePlan(current.id, note.id);
@@ -187,6 +195,10 @@ export function RouteCard({ route, onSaved }: RouteCardProps): React.JSX.Element
         onEditPlan={(note) => {
           setActionNote(null);
           openNotePlan(note);
+        }}
+        onPlayPlan={(note) => {
+          setActionNote(null);
+          playNotePlan(note);
         }}
         onDuplicatePlan={(note) => {
           setActionNote(null);

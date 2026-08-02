@@ -3,6 +3,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { FONT_SIZE, RADIUS, SPACING } from '@/constants/theme';
 import { LIMB_LABEL, LIMB_NAME, limbColor } from '@/constants/limbs';
 import { useTheme } from '@/theme/ThemeProvider';
+import { useSettingsStore } from '@/store/useSettingsStore';
+import { contrastColor } from '@/utils/color';
 import { framesOf, type DraftMove } from '@/utils/planSequence';
 
 interface MoveListProps {
@@ -36,6 +38,10 @@ export function MoveList({
   onRemoveFromFrame,
 }: MoveListProps): React.JSX.Element {
   const { colors } = useTheme();
+  const limbSides = {
+    left: useSettingsStore((s) => s.limbColorLeft),
+    right: useSettingsStore((s) => s.limbColorRight),
+  };
   const frames = framesOf(moves);
 
   /** Group a solo frame with its neighbour: join an adjacent frame, else pair. */
@@ -106,7 +112,7 @@ export function MoveList({
                   )}
 
                   {frame.map((m, mi) => {
-                    const color = limbColor(colors, m.limb);
+                    const color = limbColor(limbSides, m.limb);
                     const selected = m.key === selectedKey;
                     const index = frameStart + mi;
                     return (
@@ -120,8 +126,10 @@ export function MoveList({
                         ]}
                       >
                         <Text style={[styles.index, { color: colors.textMuted }]}>{index}</Text>
-                        <View style={[styles.chip, { backgroundColor: color }]}>
-                          <Text style={styles.chipText}>{LIMB_LABEL[m.limb]}</Text>
+                        <View style={[styles.chip, { backgroundColor: color, borderColor: colors.border }]}>
+                          <Text style={[styles.chipText, { color: contrastColor(color) }]}>
+                            {LIMB_LABEL[m.limb]}
+                          </Text>
                         </View>
                         <Text style={[styles.name, { color: colors.textPrimary }]}>
                           {LIMB_NAME[m.limb]}
@@ -271,11 +279,11 @@ const styles = StyleSheet.create({
     width: 36,
     height: 26,
     borderRadius: RADIUS.full,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   chipText: {
-    color: '#FFFFFF',
     fontSize: FONT_SIZE.xs,
     fontWeight: '800',
   },

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -67,6 +67,14 @@ interface PlanCanvasProps {
    * null to show the auto-calculated centroid of the current stance.
    */
   centerOfMass?: Point | null;
+  /**
+   * Playback only: the fully-resolved center of mass for the shown frame
+   * (override if set, else the frame's centroid), normalized. When provided, the
+   * dot glides straight to this point instead of tracking the live limb mirrors —
+   * so it interpolates smoothly across frames even as the stance gains a limb or
+   * flips between an auto and a manual center of mass. Null/omitted in edit mode.
+   */
+  comPlayback?: Point | null;
   onPlace?: (norm: Point) => void;
   onSelectMarker?: (key: string) => void;
   onCommitMarker?: (key: string, norm: Point) => void;
@@ -93,6 +101,7 @@ export function PlanCanvas({
   bubbleOpacity = 1,
   selectedKey = null,
   centerOfMass = null,
+  comPlayback = null,
   onPlace,
   onSelectMarker,
   onCommitMarker,
@@ -292,6 +301,7 @@ export function PlanCanvas({
               <CenterOfMass
                 autoCom={autoCom}
                 override={centerOfMass}
+                playbackTarget={comPlayback}
                 targets={comTargets}
                 layout={layout}
                 color={colors.planCom}
@@ -360,6 +370,11 @@ interface CenterOfMassProps {
   autoCom: SharedValue<Point | null>;
   /** Manual override for the current/shown frame (normalized), or null for auto. */
   override: Point | null;
+  /**
+   * Playback only: the resolved center of mass for the shown frame (normalized).
+   * When set, the dot glides to it directly rather than tracking the live limbs.
+   */
+  playbackTarget: Point | null;
   /** Live screen positions of the limbs the dotted lines connect to. */
   targets: { x: SharedValue<number>; y: SharedValue<number> }[];
   layout: ImageRect;
@@ -385,6 +400,7 @@ interface CenterOfMassProps {
 function CenterOfMass({
   autoCom,
   override,
+  playbackTarget,
   targets,
   layout,
   color,
@@ -409,6 +425,32 @@ function CenterOfMass({
   const dragging = useSharedValue(false);
   const hasOverride = override !== null;
 
+  // Playback position: a single point that glides straight to the frame's
+  // resolved center of mass. Unlike the live centroid, it doesn't lurch when a
+  // limb joins the stance (its mirror starts stale) or when a frame flips
+  // between an auto and a manual center of mass — it just interpolates.
+  const playX = useSharedValue(playbackTarget !== null ? toScreen(playbackTarget, layout).x : 0);
+  const playY = useSharedValue(playbackTarget !== null ? toScreen(playbackTarget, layout).y : 0);
+  const playing = playbackTarget !== null;
+  const primed = useRef(false);
+
+  useEffect(() => {
+    if (playbackTarget === null) {
+      primed.current = false;
+      return;
+    }
+    const s = toScreen(playbackTarget, layout);
+    // First frame lands instantly; later frames glide with the marker timing.
+    if (primed.current) {
+      playX.value = withTiming(s.x, { duration: 280 });
+      playY.value = withTiming(s.y, { duration: 280 });
+    } else {
+      playX.value = s.x;
+      playY.value = s.y;
+    }
+    primed.current = true;
+  }, [playbackTarget, layout, playX, playY]);
+
   useEffect(() => {
     if (override !== null) {
       const s = toScreen(override, layout);
@@ -425,9 +467,11 @@ function CenterOfMass({
     dragging.value = false;
   }, [override, layout, animated, ovX, ovY, dragging]);
 
-  // The dot's live screen position: drag wins, then override, then auto centroid.
+  // The dot's live screen position: a drag wins; then, in playback, the glided
+  // resolved point; otherwise (editing) the override, then the auto centroid.
   const pos = useDerivedValue<Point | null>(() => {
     if (dragging.value) return { x: dragX.value, y: dragY.value };
+    if (playing) return { x: playX.value, y: playY.value };
     if (hasOverride) return { x: ovX.value, y: ovY.value };
     return autoCom.value;
   });

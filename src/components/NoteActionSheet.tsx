@@ -12,6 +12,8 @@ interface NoteActionSheetProps {
   onEditNote: (note: RouteNote) => void;
   /** Open the planner for the note's photo. */
   onEditPlan: (note: RouteNote) => void;
+  /** Open the planner straight into an autoplaying slideshow of the plan. */
+  onPlayPlan: (note: RouteNote) => void;
   /** Copy the note + its plan into a new note (to try a variation). */
   onDuplicatePlan: (note: RouteNote) => void;
 }
@@ -25,6 +27,7 @@ export function NoteActionSheet({
   onClose,
   onEditNote,
   onEditPlan,
+  onPlayPlan,
   onDuplicatePlan,
 }: NoteActionSheetProps): React.JSX.Element {
   const { colors } = useTheme();
@@ -35,6 +38,16 @@ export function NoteActionSheet({
     <Modal visible={note !== null} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
       <View pointerEvents="box-none" style={[styles.menu, { backgroundColor: colors.surface }]}>
+        {canPlan && hasPlan && (
+          <Row
+            icon="play-circle-outline"
+            label="Play plan"
+            onPress={() => {
+              if (note !== null) onPlayPlan(note);
+            }}
+            border
+          />
+        )}
         <Row
           icon="create-outline"
           label="Edit note"

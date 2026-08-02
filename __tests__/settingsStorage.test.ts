@@ -18,6 +18,8 @@ describe('settingsStorage', () => {
       muteVideosByDefault: false,
       bubbleScale: 1.4,
       bubbleOpacity: 0.5,
+      limbColorLeft: '#2563EB',
+      limbColorRight: '#DC2626',
       notesLayout: 'grid',
       gradeSystem: 'French',
     });
@@ -28,6 +30,8 @@ describe('settingsStorage', () => {
       muteVideosByDefault: false,
       bubbleScale: 1.4,
       bubbleOpacity: 0.5,
+      limbColorLeft: '#2563EB',
+      limbColorRight: '#DC2626',
       notesLayout: 'grid',
       gradeSystem: 'French',
     });

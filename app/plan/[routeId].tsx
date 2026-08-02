@@ -33,6 +33,7 @@ import {
   appendMove,
   clearCurrentCom,
   comOverrideAt,
+  computeCenterOfMass,
   currentStanceKeys,
   frameStanceAt,
   framesOf,
@@ -105,7 +106,13 @@ async function resolveDimensions(
 export default function RoutePlanScreen(): React.JSX.Element {
   const { colors } = useTheme();
   const router = useRouter();
-  const params = useLocalSearchParams<{ routeId: string; noteId?: string; mode?: string }>();
+  const params = useLocalSearchParams<{
+    routeId: string;
+    noteId?: string;
+    mode?: string;
+    /** '1' opens straight into an autoplaying slideshow (from a note tap). */
+    autoplay?: string;
+  }>();
   const limbOrder = limbsForMode(parsePlanMode(params.mode));
   const getRoute = useRouteStore((s) => s.getRoute);
   const loadPlan = usePlanStore((s) => s.loadPlan);
@@ -115,6 +122,9 @@ export default function RoutePlanScreen(): React.JSX.Element {
   const setBubbleScale = useSettingsStore((s) => s.setBubbleScale);
   const bubbleOpacity = useSettingsStore((s) => s.bubbleOpacity);
   const setBubbleOpacity = useSettingsStore((s) => s.setBubbleOpacity);
+  const limbColorLeft = useSettingsStore((s) => s.limbColorLeft);
+  const limbColorRight = useSettingsStore((s) => s.limbColorRight);
+  const limbSides = { left: limbColorLeft, right: limbColorRight };
 
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [moves, setMoves] = useState<DraftMove[]>([]);
@@ -143,6 +153,10 @@ export default function RoutePlanScreen(): React.JSX.Element {
 
   const routeId = Number(params.routeId);
   const noteId = params.noteId !== undefined ? Number(params.noteId) : null;
+  const autoplay = params.autoplay === '1';
+  // Consume the autoplay param once, so returning to the screen doesn't restart
+  // the slideshow after the user has paused or stepped away from it.
+  const autoplayStarted = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -188,9 +202,18 @@ export default function RoutePlanScreen(): React.JSX.Element {
           setState({ status: 'no-photo' });
           return;
         }
-        applyMoves(plan !== null ? fromPlan(plan) : []);
+        const loadedMoves = plan !== null ? fromPlan(plan) : [];
+        applyMoves(loadedMoves);
         undoStack.current = [];
         setCanUndo(false);
+        // A note tapped for playback opens straight into the autoplaying
+        // slideshow, as long as the plan actually has moves to play.
+        if (autoplay && !autoplayStarted.current && loadedMoves.length > 0) {
+          autoplayStarted.current = true;
+          setMode('play');
+          setStep(1);
+          setAutoPlaying(true);
+        }
         const note =
           noteId !== null && Number.isFinite(noteId)
             ? (durable ?? route).noteEntries.find((n) => n.id === noteId)
@@ -207,7 +230,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
       return () => {
         active = false;
       };
-    }, [routeId, noteId, getRoute, loadPlan, loadNotePlan, applyMoves]),
+    }, [routeId, noteId, autoplay, getRoute, loadPlan, loadNotePlan, applyMoves]),
   );
 
   /** Apply an edit, persist it, then reconcile keys/sequence from the save. */
@@ -391,6 +414,14 @@ export default function RoutePlanScreen(): React.JSX.Element {
     ? comOverrideAt(moves, safeStep)
     : comOverrideAt(moves, frames.length);
 
+  // In playback the dot glides straight to a fully-resolved point per frame (the
+  // override if set, else the frame's centroid) so it interpolates smoothly
+  // rather than tracking the live limb mirrors, which jump when the stance gains
+  // a limb or the frame flips between an auto and a manual center of mass.
+  const playbackCom = playing
+    ? (comOverride ?? computeCenterOfMass(frameStanceAt(moves, safeStep)))
+    : null;
+
   let markers: CanvasMarker[];
   if (playing) {
     const stance = frameStanceAt(moves, safeStep);
@@ -400,7 +431,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
       limb: l,
       x: stance[l]!.x,
       y: stance[l]!.y,
-      color: limbColor(colors, l),
+      color: limbColor(limbSides, l),
       badge: null,
       highlighted: moving.has(l),
       comMember: true,
@@ -416,7 +447,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
       limb: m.limb,
       x: m.x,
       y: m.y,
-      color: limbColor(colors, m.limb),
+      color: limbColor(limbSides, m.limb),
       badge: m.key === selectedKey ? i + 1 : null,
       dot: true,
       groupId: m.groupId,
@@ -455,6 +486,7 @@ export default function RoutePlanScreen(): React.JSX.Element {
           bubbleOpacity={bubbleOpacity}
           selectedKey={playing ? null : selectedKey}
           centerOfMass={comOverride}
+          comPlayback={playbackCom}
           onPlace={handlePlace}
           onSelectMarker={setSelectedKey}
           onCommitMarker={handleCommitMarker}

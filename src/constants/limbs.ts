@@ -1,10 +1,23 @@
 import type { ComponentProps } from 'react';
 import type { MaterialCommunityIcons } from '@expo/vector-icons';
-import type { Palette } from '@/constants/theme';
 import type { Limb } from '@/types';
 
 /** Canonical limb order for the selector and any limb iteration. */
 export const LIMB_ORDER: readonly Limb[] = ['LH', 'RH', 'LF', 'RF'];
+
+/** Which side of the body a limb belongs to — the granularity of marker color. */
+export type LimbSide = 'left' | 'right';
+
+/**
+ * A limb's side. Marker color is scoped to the side (not the limb), so the left
+ * hand and left foot share one color and the right hand and right foot another.
+ */
+export const LIMB_SIDE: Record<Limb, LimbSide> = {
+  LH: 'left',
+  LF: 'left',
+  RH: 'right',
+  RF: 'right',
+};
 
 type MCIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
@@ -43,16 +56,11 @@ export const LIMB_NAME: Record<Limb, string> = {
   RF: 'Right foot',
 };
 
-/** The theme color for a limb's marker/chip. */
-export function limbColor(colors: Palette, limb: Limb): string {
-  switch (limb) {
-    case 'LH':
-      return colors.limbLH;
-    case 'RH':
-      return colors.limbRH;
-    case 'LF':
-      return colors.limbLF;
-    case 'RF':
-      return colors.limbRF;
-  }
+/**
+ * The user's marker/chip color for a limb, picked by side from the two
+ * configurable side colors (see settings). Left hand/foot share `left`, right
+ * hand/foot share `right`.
+ */
+export function limbColor(sides: { left: string; right: string }, limb: Limb): string {
+  return LIMB_SIDE[limb] === 'left' ? sides.left : sides.right;
 }

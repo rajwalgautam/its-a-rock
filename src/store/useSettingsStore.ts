@@ -17,6 +17,8 @@ interface SettingsState extends Settings {
   setMuteVideosByDefault: (value: boolean) => void;
   setBubbleScale: (value: number) => void;
   setBubbleOpacity: (value: number) => void;
+  setLimbColorLeft: (value: string) => void;
+  setLimbColorRight: (value: string) => void;
   setNotesLayout: (value: NotesLayout) => void;
   setGradeSystem: (value: GradeSystem) => void;
 }
@@ -29,6 +31,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   muteVideosByDefault: DEFAULT_SETTINGS.muteVideosByDefault,
   bubbleScale: DEFAULT_SETTINGS.bubbleScale,
   bubbleOpacity: DEFAULT_SETTINGS.bubbleOpacity,
+  limbColorLeft: DEFAULT_SETTINGS.limbColorLeft,
+  limbColorRight: DEFAULT_SETTINGS.limbColorRight,
   notesLayout: DEFAULT_SETTINGS.notesLayout,
   gradeSystem: DEFAULT_SETTINGS.gradeSystem,
   isLoaded: false,
@@ -73,6 +77,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     void persist(get);
   },
 
+  setLimbColorLeft: (value) => {
+    set({ limbColorLeft: value });
+    void persist(get);
+  },
+
+  setLimbColorRight: (value) => {
+    set({ limbColorRight: value });
+    void persist(get);
+  },
+
   setNotesLayout: (value) => {
     set({ notesLayout: value });
     void persist(get);
@@ -93,6 +107,8 @@ function persist(get: () => SettingsState): Promise<void> {
     muteVideosByDefault,
     bubbleScale,
     bubbleOpacity,
+    limbColorLeft,
+    limbColorRight,
     notesLayout,
     gradeSystem,
   } = get();
@@ -104,6 +120,8 @@ function persist(get: () => SettingsState): Promise<void> {
     muteVideosByDefault,
     bubbleScale,
     bubbleOpacity,
+    limbColorLeft,
+    limbColorRight,
     notesLayout,
     gradeSystem,
   });
